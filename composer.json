@@ -1,0 +1,38 @@
+{
+    "name": "ilbronza/menu",
+    "description": ":Menu generator",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Davide Bronzini",
+            "email": "davide@sistema.srl",
+            "homepage": "https://sistema.srl"
+        }
+    ],
+    "homepage": "https://github.com/ilbronza/menu",
+    "keywords": ["Laravel", "Menu"],
+    "require": {
+    },
+    "require-dev": {
+    },
+    "autoload": {
+        "psr-4": {
+            "IlBronza\\Menu\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "IlBronza\\Menu\\Tests\\": "tests"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "IlBronza\\Menu\\MenuServiceProvider"
+            ],
+            "aliases": {
+                "Menu": "IlBronza\\Menu\\Facades\\Menu"
+            }
+        }
+    }
+}
