@@ -5,8 +5,7 @@
 	<div class="{{ $navbar->getHtmlClasses() }}">
 		<ul class="uk-navbar-nav">
 			@foreach($navbar->getButtons() as $button)
-
-			{!! $button->navbarRender('horizontal') !!}
+				{!! $button->navbarRender('horizontal') !!}
 			@endforeach
 		</ul>
 	</div>

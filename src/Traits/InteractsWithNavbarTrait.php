@@ -11,7 +11,7 @@ trait InteractsWithNavbarTrait
         return $this->navbar ?? null;
     }
 
-    public function removeFromNavbar() : static
+    public function removeFromNavbar() : self
     {
         if($navbar = $this->getNavbar())
             $navbar->removeButton($this);
@@ -21,7 +21,7 @@ trait InteractsWithNavbarTrait
         return $this;
     }
 
-    public function addToNavbar(Navbar $navbar) : static
+    public function addToNavbar(Navbar $navbar) : self
     {
         $navbar->addButton($this);
         $this->navbar = $navbar;

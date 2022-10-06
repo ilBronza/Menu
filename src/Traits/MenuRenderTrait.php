@@ -46,7 +46,7 @@ trait MenuRenderTrait
         return $result;
     }
 
-    public function _render(string $type) : View
+    public function _render(string $type) : string
     {
         $this->loadItemsFromServiceProviders();
 
@@ -54,7 +54,7 @@ trait MenuRenderTrait
 
         $viewName = $this->getViewName($type);
 
-        return view($viewName, ['menu' => $this]);
+        return view($viewName, ['menu' => $this])->render();
     }
 
     public function render(string $type = 'horizontal')

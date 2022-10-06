@@ -120,7 +120,7 @@ class Menu
 		return $this->navbars->max('sequence') ?? 0;
 	}
 
-	public function moveItemToNavbar(Button $button, $navbar) : static
+	public function moveItemToNavbar(Button $button, $navbar) : self
 	{
 		if(is_string($navbar))
 			$navbar = $this->provideNavbar($navbar);

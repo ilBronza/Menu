@@ -1,7 +1,10 @@
 # Menu
  Menu generator
 
+``` bash
+declare App\Providers\Helpers\MenuItems
 
+```
 
 
 
