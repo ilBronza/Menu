@@ -6,6 +6,14 @@ use IlBronza\Menu\Navbar;
 
 trait InteractsWithNavbarTrait
 {
+    public function isNavbarButton() : bool
+    {
+        if($this->isChild())
+            return $this->parent->isNavbarButton();
+
+        return !! $this->navbar;
+    }
+
     public function getNavbar() : ? Navbar
     {
         return $this->navbar ?? null;
