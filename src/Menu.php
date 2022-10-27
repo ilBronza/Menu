@@ -27,6 +27,22 @@ class Menu
 	{
 		$this->navbars = collect();
 		$this->buttons = collect();
+
+		$this->manageLogo();
+	}
+
+	public function showLogo()
+	{
+		return config('menu.logo.show', true);
+	}
+
+	public function manageLogo()
+	{
+		$navbar = $this->provideNavbar(
+			$this->getDefaultNavbarName()
+		);
+
+		$navbar->setLogoByParameters(config('menu.logo'));
 	}
 
     public function getId()

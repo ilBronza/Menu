@@ -3,6 +3,11 @@
 	@foreach($menu->getNavbars() as $navbar)
 	
 	<div class="{{ $navbar->getHtmlClasses() }}">
+
+		@if(($menu->showLogo())&&($logo = $navbar->getLogo()))
+			{!! $logo->render() !!}
+		@endif
+
 		<ul class="uk-navbar-nav">
 			@foreach($navbar->getButtons() as $button)
 				{!! $button->navbarRender('horizontal') !!}

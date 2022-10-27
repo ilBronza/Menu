@@ -10,6 +10,8 @@ class Navbar
 
 	public $position = 'left';
 
+	public $logo;
+
 	public $roles = [];
 	public $exceptRoles = [];
 	public $clearfix = false;
@@ -19,6 +21,16 @@ class Navbar
 	public function __construct()
 	{
 		$this->buttons = collect();
+	}
+
+	public function setLogoByParameters(array $parameters)
+	{
+		$this->logo = Logo::create($parameters);
+	}
+
+	public function getLogo()
+	{
+		return $this->logo;
 	}
 
 	public function getButtons()
@@ -52,6 +64,8 @@ class Navbar
 	public function addButton(Button $button) : Button
 	{
 		$this->buttons->push($button);
+
+		$button->removeButtonHtmlClass('uk-button');
 
 		$button->navbar = $this;
 
