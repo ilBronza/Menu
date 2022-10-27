@@ -1,10 +1,7 @@
 <?php
 
 return [
-
-
 	'usesSession' => env('MENU_USES_SESSION', false),
-
 
 
 	'serviceProviders' => [
@@ -14,6 +11,8 @@ return [
 
 
 	'childrenPerColumn' => 10,
+
+
 	'logo' => [
 		// 'path' => env(
 		// 	'MENU_LOGO_PATH',
