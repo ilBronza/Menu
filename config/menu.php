@@ -6,7 +6,7 @@ return [
 
 	'serviceProviders' => [
 		'accountmanager',
-		'filecabinet'
+		// 'filecabinet'
 	],
 
 
@@ -21,6 +21,8 @@ return [
 		'path' => env(
 			'MENU_LOGO_PATH',
 			'https://sistema.srl/images/logo/logo_footer.gif'),
-		'width' => '80px'
+		'width' => env(
+			'MENU_LOGO_WIDTH',
+			'80px'),
 	]
 ];

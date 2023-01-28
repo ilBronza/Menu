@@ -206,6 +206,15 @@ class Menu
 	public function loadItemsFromServiceProviders()
 	{
 		foreach($this->getServiceProviders() as $serviceProvider)
-			app($serviceProvider)->manageMenuButtons();
+		{
+			try
+			{
+				app($serviceProvider)->manageMenuButtons();
+			}
+			catch(\Exception $e)
+			{
+				throw new \Exception("Add {$serviceProvider} to the project or remove it from menu configurations");
+			}
+		}
 	}
 }
