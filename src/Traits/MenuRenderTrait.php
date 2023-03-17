@@ -3,6 +3,7 @@
 namespace IlBronza\Menu\Traits;
 
 use IlBronza\Menu\Navbar;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 trait MenuRenderTrait
@@ -59,6 +60,8 @@ trait MenuRenderTrait
 
     public function render(string $type = 'horizontal')
     {
+        Log::error('chiamato ilBronza Menu MenuRenderTrait due volte render per verticale e offcanvas, ridurre oggetto nel service provider');
+
         if($this->usesSession($type))
             return $this->renderFromSession($type);
 
