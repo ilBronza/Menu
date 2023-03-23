@@ -10,7 +10,7 @@ declare App\Providers\Helpers\MenuItems
 
 	$menu = app('menu');
 
-	$menu->setUsesSession(false);
+	$menu->setUsesCache(false);
 
 	$buttons = [];
 

@@ -1,7 +1,7 @@
 <?php
 
 return [
-	'usesSession' => env('MENU_USES_SESSION', false),
+	'usesCache' => env('MENU_USES_CACHE', false),
 
 
 	'serviceProviders' => [

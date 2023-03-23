@@ -2,47 +2,49 @@
 
 namespace IlBronza\Menu\Traits;
 
+use Auth;
 use IlBronza\Menu\Navbar;
+use IlBronza\UikitTemplate\Fetcher;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 trait MenuRenderTrait
 {
-    public function setUsesSession(bool $usesSession)
+    public function setUsesCache(bool $usesCache)
     {
-        $this->usesSession = $usesSession;
+        $this->usesCache = $usesCache;
     }
 
-    public function usesSession()
+    public function usesCache()
     {
-        if(is_null($this->usesSession))
-            return config('menu.usesSession');
+        if(is_null($this->usesCache))
+            return config('menu.usesCache');
 
-        return $this->usesSession;
+        return $this->usesCache;
     }
 
-    public function getSessionMenuName(string $type) : string
+    public function getCacheMenuName(string $type) : string
     {
-        return "iBMenu{$type}";
+        return Auth::id() . "iBMenu{$type}";
     }
 
-    public function getFromSession(string $type) : ? string
+    public function getFromCache(string $type) : ? string
     {
-        $menuName = $this->getSessionMenuName($type);
+        $menuName = $this->getCacheMenuName($type);
 
-        return session($menuName);
+        return cache($menuName);
     }
 
-    public function renderFromSession(string $type) : string
+    public function renderFromCache(string $type) : string
     {
-        if($result = $this->getFromSession($type))
+        if($result = $this->getFromCache($type))
             return $result;
 
         $result = $this->_render($type);
 
-        $menuName = $this->getSessionMenuName($type);
+        $menuName = $this->getCacheMenuName($type);
 
-        session([$menuName => $result]);
+        cache([$menuName => $result]);
 
         return $result;
     }
@@ -60,12 +62,21 @@ trait MenuRenderTrait
 
     public function render(string $type = 'horizontal')
     {
-        Log::error('chiamato ilBronza Menu MenuRenderTrait due volte render per verticale e offcanvas, ridurre oggetto nel service provider');
+        // Log::error('chiamato ilBronza Menu MenuRenderTrait due volte render per verticale e offcanvas, ridurre oggetto nel service provider');
 
-        if($this->usesSession($type))
-            return $this->renderFromSession($type);
+        if($this->usesCache($type))
+            return $this->renderFromCache($type);
 
         return $this->_render($type);
+    }
+
+    public function renderFetcher()
+    {
+        $fetcher = new Fetcher([
+            'url' => route('ilBronza.menu.fetchMenu')
+        ]);
+
+        return $fetcher->render();
     }
 
     

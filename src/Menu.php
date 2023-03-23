@@ -21,7 +21,7 @@ class Menu
 	public $offCanvasButton;
 	static $defaultNavbarName = 'default';
 
-	public $usesSession;
+	public $usesCache;
 
 	public function __construct()
 	{
