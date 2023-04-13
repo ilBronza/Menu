@@ -213,7 +213,7 @@ class Menu
 			}
 			catch(\Exception $e)
 			{
-				throw new \Exception("Add {$serviceProvider} to the project or remove it from menu configurations");
+				throw new \Exception("Add {$serviceProvider} to the project or remove it from menu configurations: " . $e->getMessage());
 			}
 		}
 	}
