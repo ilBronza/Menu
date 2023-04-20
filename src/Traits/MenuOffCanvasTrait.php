@@ -32,6 +32,6 @@ trait MenuOffCanvasTrait
         if(! $this->offCanvasButton)
             return $this->setOffCanvasButton();
 
-        return $this->getOffCanvasButton();
+        return $this->offCanvasButton;
     }    
 }

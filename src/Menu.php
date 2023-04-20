@@ -131,6 +131,14 @@ class Menu
 		return $navbar;
 	}
 
+	public function provideMainRightBar()
+	{
+		$nav = $this->getNavbarByName('mainRightNavbar');
+		$nav->setPosition('right');
+
+		return $nav;
+	}
+
 	public function getNavbarMaxSequence() : int
 	{
 		return $this->navbars->max('sequence') ?? 0;

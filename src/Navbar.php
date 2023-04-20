@@ -87,6 +87,11 @@ class Navbar
 		return $this->position;
 	}
 
+	public function setPosition(string $position)
+	{
+		return $this->position = $position;
+	}
+
 	public function template()
 	{
 		return app(config('app.template', 'uikittemplate'));

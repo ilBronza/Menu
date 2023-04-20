@@ -16,7 +16,7 @@
 	</div>
 	@endforeach
 
-	@if($menu->hasOffCanvas())
+{{-- 	@if($menu->hasOffCanvas())
 		<div class="uk-navbar-right">
 			<ul class="uk-navbar-nav">
 				<li>
@@ -25,7 +25,7 @@
 			</ul>
 		</div>
 	@endif
-
+ --}}
 </nav>
 
 

@@ -55,6 +55,14 @@ trait MenuRenderTrait
 
         $this->loadItemsFromProject();
 
+        if($this->hasOffCanvas())
+        {
+            $mainRightBar = $this->provideMainRightBar();
+            $offCanvasButton = $this->getOffCanvasButton();
+
+            $this->addToNavbar($offCanvasButton, $mainRightBar);
+        }
+
         $viewName = $this->getViewName($type);
 
         return view($viewName, ['menu' => $this])->render();
