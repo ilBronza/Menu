@@ -18,6 +18,7 @@ class Navbar
 	public $breakRow = false;
 
 	public $buttons;
+	public $customHtmlClasses = [];
 
 	public function __construct()
 	{
@@ -115,6 +116,21 @@ class Navbar
 		return app(config('app.template', 'uikittemplate'));
 	}
 
+	public function addCustomHtmlClass(string $customHtmlClass)
+	{
+		$this->customHtmlClasses[] = $customHtmlClass;
+	}
+
+	public function getCustomHtmlClasses() : array
+	{
+		return $this->customHtmlClasses;
+	}
+
+	public function getCustomHtmlClassesString() : string
+	{
+		return implode(' ', $this->getCustomHtmlClasses());
+	}
+
 	public function getPositionClass()
 	{
 		return $this->template()->getNavbarPositionClass($this->position);
@@ -142,6 +158,8 @@ class Navbar
 		$result[] = $this->getPositionClass();
 
 		$result[] = $this->getClearfixClass();
+
+		$result[] = $this->getCustomHtmlClassesString();
 
 		return implode(" ", $result);
 	}
