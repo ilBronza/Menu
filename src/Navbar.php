@@ -15,12 +15,23 @@ class Navbar
 	public $roles = [];
 	public $exceptRoles = [];
 	public $clearfix = false;
+	public $breakRow = false;
 
 	public $buttons;
 
 	public function __construct()
 	{
 		$this->buttons = collect();
+	}
+
+	public function mustBreakRow() : bool
+	{
+		return $this->breakRow;
+	}
+
+	public function setBreakRow(bool $breakRow = true)
+	{
+		return $this->breakRow = $breakRow;
 	}
 
 	public function setLogoByParameters(array $parameters)

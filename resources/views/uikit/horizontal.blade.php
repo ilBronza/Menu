@@ -1,6 +1,13 @@
 <nav class="uk-navbar-container {{ $menu->getWrapClass() }}" uk-navbar>
 
 	@foreach($menu->getNavbars() as $navbar)
+
+		@if($navbar->mustBreakRow())
+
+</nav>
+<nav class="uk-navbar-container {{ $menu->getWrapClass() }}" uk-navbar>
+
+		@endif
 	
 	<div class="{{ $navbar->getHtmlClasses() }}">
 
