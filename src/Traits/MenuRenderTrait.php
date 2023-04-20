@@ -61,6 +61,8 @@ trait MenuRenderTrait
             $offCanvasButton = $this->getOffCanvasButton();
 
             $this->addToNavbar($offCanvasButton, $mainRightBar);
+
+            $offCanvasButton->setLast();
         }
 
         $viewName = $this->getViewName($type);

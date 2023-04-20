@@ -46,6 +46,13 @@ class Navbar
 		return $this->buttons;
 	}
 
+	public function getButtonsCount()
+	{
+		return count(
+			$this->getAllButtons()
+		);
+	}
+
 	static function create(array $parameters = [])
 	{
 		$navbar = new static();

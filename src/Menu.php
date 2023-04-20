@@ -162,6 +162,9 @@ class Menu
 
 	public function addToNavbar(Button $button, Navbar $navbar) : Button
 	{
+		if($currentNavbar = $button->getNavbar())
+			$currentNavbar->removeButton($button);
+
 		$navbar->addButton($button);
 
 		return $button;
