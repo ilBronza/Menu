@@ -86,6 +86,8 @@ trait MenuRenderTrait
             'url' => route('ilBronza.menu.fetchMenu')
         ]);
 
+        $fetcher->setRefresh(false);
+
         return $fetcher->render();
     }
 
