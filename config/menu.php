@@ -9,9 +9,11 @@ return [
 		// 'filecabinet'
 	],
 
+	'buttons' => [
+		'dropdownMode' => 'click',
+	],
 
 	'childrenPerColumn' => 10,
-
 
 	'logo' => [
 		// 'path' => env(

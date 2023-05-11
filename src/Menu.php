@@ -96,6 +96,10 @@ class Menu
 	{
 		$button = Button::create($parameters);
 
+		$button->setDropdownMode(
+			$parameters['dropdownMode'] ?? config('menu.buttons.dropdownMode', 'hover')
+		);
+
 		$navbar = $this->provideNavbar(
 			$parameters['navbar'] ?? $this->getDefaultNavbarName()
 		);
