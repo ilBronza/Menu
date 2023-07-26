@@ -11,6 +11,7 @@ class Navbar
 	public $position = 'left';
 
 	public $logo;
+	public $sequence;
 
 	public $roles = [];
 	public $exceptRoles = [];

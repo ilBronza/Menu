@@ -19,6 +19,7 @@ class Menu
 	public $buttons;
 
 	public $offCanvasButton;
+	public $defaultNavbar;
 	static $defaultNavbarName = 'default';
 
 	public $usesCache;
