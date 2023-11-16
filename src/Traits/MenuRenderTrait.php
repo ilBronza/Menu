@@ -55,15 +55,15 @@ trait MenuRenderTrait
 
         $this->loadItemsFromProject();
 
-        if($this->hasOffCanvas())
-        {
-            $mainRightBar = $this->provideMainRightBar();
-            $offCanvasButton = $this->getOffCanvasButton();
+        // if($this->hasOffCanvas())
+        // {
+        //     $mainRightBar = $this->provideMainRightBar();
+        //     $offCanvasButton = $this->getOffCanvasButton();
 
-            $this->addToNavbar($offCanvasButton, $mainRightBar);
+        //     $this->addToNavbar($offCanvasButton, $mainRightBar);
 
-            $offCanvasButton->setLast();
-        }
+        //     $offCanvasButton->setLast();
+        // }
 
         $viewName = $this->getViewName($type);
 

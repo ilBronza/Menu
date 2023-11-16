@@ -32,6 +32,16 @@ class Menu
 		$this->manageLogo();
 	}
 
+	public function provideSettingsButton()
+	{
+		return $this->provideButton([
+                'text' => 'generals.settings',
+                'name' => 'settings',
+                'icon' => 'gear',
+                'roles' => ['administrator']
+            ]);
+	}
+
 	public function showLogo()
 	{
 		return config('menu.logo.show', true);

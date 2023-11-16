@@ -9,7 +9,7 @@
 
 		@endif
 	
-	<div class="{{ $navbar->getHtmlClasses() }}">
+	<div class="{{ $navbar->getHtmlClasses() }} uk-visible@l">
 
 		@if(($menu->showLogo())&&($logo = $navbar->getLogo()))
 			{!! $logo->render() !!}
@@ -23,16 +23,16 @@
 	</div>
 	@endforeach
 
-{{-- 	@if($menu->hasOffCanvas())
-		<div class="uk-navbar-right">
-			<ul class="uk-navbar-nav">
-				<li>
-					{!! $menu->getOffCanvasButton()->renderButton() !!}
-				</li>
-			</ul>
-		</div>
-	@endif
- --}}
+@if($menu->hasOffCanvas())
+	<div class="uk-navbar-right uk-hidden@l">
+		<ul class="uk-navbar-nav">
+			<li>
+				{!! $menu->getOffCanvasButton()->renderButton() !!}
+			</li>
+		</ul>
+	</div>
+@endif
+
 </nav>
 
 
