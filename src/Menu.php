@@ -32,14 +32,14 @@ class Menu
 		$this->manageLogo();
 	}
 
-	public function provideSettingsButton()
+	public function provideSettingsButton() : Button
 	{
 		return $this->provideButton([
                 'text' => 'generals.settings',
                 'name' => 'settings',
                 'icon' => 'gear',
                 'roles' => ['administrator']
-            ]);
+            ])->setFirst();
 	}
 
 	public function showLogo()
@@ -235,12 +235,14 @@ class Menu
 		{
 			try
 			{
-				app($serviceProvider)->manageMenuButtons();
+				$serviceProvider = app($serviceProvider);
 			}
 			catch(\Exception $e)
 			{
 				throw new \Exception("Add {$serviceProvider} to the project or remove it from menu configurations: " . $e->getMessage());
 			}
+
+			$serviceProvider->manageMenuButtons();
 		}
 	}
 }
