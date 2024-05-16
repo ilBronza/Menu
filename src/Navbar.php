@@ -3,10 +3,18 @@
 namespace IlBronza\Menu;
 
 use IlBronza\Buttons\Button;
+use IlBronza\CRUD\Interfaces\RecursiveTreeInterface;
+use IlBronza\Menu\Traits\MenuPartsGenericRenderTrait;
 
 class Navbar
 {
+	use MenuPartsGenericRenderTrait;
+
+	public ? RecursiveTreeInterface $activeModel;
+
 	public $name = 'default';
+	public $orientation = 'horizontal';
+	public $usesCache = false;
 
 	public $position = 'left';
 
@@ -122,6 +130,13 @@ class Navbar
 		$this->customHtmlClasses[] = $customHtmlClass;
 	}
 
+	public function setSmall() : static
+	{
+		$this->addCustomHtmlClass('ib-navbar-small');
+
+		return $this;
+	}
+
 	public function getCustomHtmlClasses() : array
 	{
 		return $this->customHtmlClasses;
@@ -169,4 +184,22 @@ class Navbar
 	{
 		return $this->clearfix;
 	}
+
+    public function getCacheName() : string
+    {
+        return 'cachedNavbar' . $this->getOrientation() . $this->getName();
+    }
+
+    public function setActiveButtonByModel(RecursiveTreeInterface $activeModel) : static
+    {
+    	$this->activeModel = $activeModel;
+
+    	return $this;
+    }
+
+    public function getActiveButton() : ? Button
+	{
+		return $this->activeModel;
+	}
+
 }

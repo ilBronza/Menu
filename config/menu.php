@@ -1,12 +1,14 @@
 <?php
 
 return [
-	'usesCache' => env('MENU_USES_CACHE', false),
+	// 'usesCache' => env('MENU_USES_CACHE', false),
+	'usesCache' => false,
 
 
 	'serviceProviders' => [
 		'accountmanager',
-		// 'filecabinet'
+		'CRUDMenuUtilities',
+		'translationsmenumanager'
 	],
 
 	'buttons' => [
@@ -22,7 +24,7 @@ return [
 		'show' => true,
 		'path' => env(
 			'MENU_LOGO_PATH',
-			'https://sistema.srl/images/logo/logo_footer.gif'),
+			'/img/logo-one.jpeg'),
 		'width' => env(
 			'MENU_LOGO_WIDTH',
 			'80px'),

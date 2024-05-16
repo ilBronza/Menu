@@ -1,6 +1,6 @@
 <nav class="uk-navbar-container {{ $menu->getWrapClass() }}" uk-navbar>
 
-	@foreach($menu->getNavbars() as $navbar)
+	@foreach($menu->getNavbarsByOrientation('horizontal') as $navbar)
 
 		@if($navbar->mustBreakRow())
 
@@ -8,19 +8,9 @@
 <nav class="uk-navbar-container {{ $menu->getWrapClass() }}" uk-navbar>
 
 		@endif
+
+	{!! $navbar->render() !!}
 	
-	<div class="{{ $navbar->getHtmlClasses() }} uk-visible@l">
-
-		@if(($menu->showLogo())&&($logo = $navbar->getLogo()))
-			{!! $logo->render() !!}
-		@endif
-
-		<ul class="uk-navbar-nav">
-			@foreach($navbar->getButtons() as $button)
-				{!! $button->navbarRender('horizontal') !!}
-			@endforeach
-		</ul>
-	</div>
 	@endforeach
 
 @if($menu->hasOffCanvas())
@@ -37,5 +27,5 @@
 
 
 @if($menu->hasOffCanvas())
-{!! app('menu')->render('offCanvas') !!}
+{!! $menu->renderOffcanvas() !!}
 @endif

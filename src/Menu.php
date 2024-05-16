@@ -4,15 +4,26 @@ namespace IlBronza\Menu;
 
 use App\Providers\Helpers\MenuItems;
 use IlBronza\Buttons\Button;
+use IlBronza\CRUD\Interfaces\RecursiveTreeInterface;
+use IlBronza\Menu\Helpers\MenuTreeCreatorHelper;
 use IlBronza\Menu\Navbar;
 use IlBronza\Menu\Traits\MenuOffCanvasTrait;
+use IlBronza\Menu\Traits\MenuPartsGenericRenderTrait;
 use IlBronza\Menu\Traits\MenuRenderTrait;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class Menu
 {
 	use MenuOffCanvasTrait;
-	use MenuRenderTrait;
+	use MenuPartsGenericRenderTrait;
+
+	use MenuRenderTrait {
+		MenuRenderTrait::_render insteadof MenuPartsGenericRenderTrait;
+	}
+
+
+
 
 	public $id;
 	public $navbars;
@@ -20,6 +31,7 @@ class Menu
 
 	public $offCanvasButton;
 	public $defaultNavbar;
+	public $orientation = 'horizontal';
 	static $defaultNavbarName = 'default';
 
 	public $usesCache;
@@ -76,7 +88,16 @@ class Menu
         $this->id = $id;
     }
 
-	public function getNavbars()
+    public function getNavbarsByOrientation(string $orientation) : Collection
+    {
+    	return $this->getNavbars()->filter(function($navbar) use($orientation)
+			{
+				return $navbar->getOrientation() == $orientation;
+
+			});
+    }
+
+	public function getNavbars() : Collection
 	{
 		return $this->navbars;
 	}
@@ -88,6 +109,9 @@ class Menu
 
 	public function provideButton(array $parameters) : Button
 	{
+		if(! isset($parameters['name']))
+			$parameters['name'] = Str::slug($parameters['text'] ?? $parameters['href']);
+
         if($button = $this->getButtonByName($parameters['name']))
         	return $button;
 
@@ -118,6 +142,21 @@ class Menu
 		$button->addToNavbar($navbar);
 
 		return $button;
+	}
+
+	public function getIndependentNavbarByName(string $name) : Navbar
+	{
+		// if($navbar = $this->independentNavbars->firstWhere('name', $name))
+		// 	return $navbar;
+
+		$navbar = Navbar::create([
+			'name' => $name,
+			// 'sequence' => $this->getNavbarMaxSequence() + 1
+		]);
+
+		// $this->independentNavbars->push($navbar);
+
+		return $navbar;
 	}
 
 	public function getNavbarByName(string $name) : Navbar
@@ -185,18 +224,6 @@ class Menu
 		return $button;
 	}
 
-	public function getTemplateName()
-	{
-		return config('menu.template', 'uikit');
-	}
-
-	public function getViewName(string $type = 'horizontal')
-	{
-		$template = $this->getTemplateName();
-
-		return 'menu::' . $template . '.' . $type;
-	}
-
 	public function hasClearfixNavbars() : bool
 	{
 		foreach($this->getNavbars() as $navbar)
@@ -228,6 +255,20 @@ class Menu
 	{
 		MenuItems::loadProjectMenuItems();
 	}
+
+	public function createFromRecursiveTree(string $navbarName, RecursiveTreeInterface $tree, RecursiveTreeInterface $activeNode = null)
+	{
+		$navbar = MenuTreeCreatorHelper::createNavbarFromRecursiveTree($navbarName, $tree, $activeNode);
+
+		$navbar->setOrientation('vertical');
+
+		return $navbar;
+	}
+
+    public function getCacheName() : string
+    {
+        return Auth::id() . "iBMenu{$this->getOrientation()}";
+    }
 
 	public function loadItemsFromServiceProviders()
 	{
