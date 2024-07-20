@@ -5,6 +5,7 @@ namespace IlBronza\Menu\Helpers;
 use IlBronza\Buttons\Button;
 use IlBronza\CRUD\Interfaces\RecursiveTreeInterface;
 use IlBronza\Menu\Navbar;
+use Illuminate\Database\Eloquent\Model;
 
 class MenuTreeCreatorHelper
 {
@@ -55,10 +56,25 @@ class MenuTreeCreatorHelper
 		if(($active)&&(method_exists($parent, 'setContainsActiveElement')))
 			$parent->setContainsActiveElement();
 
+		foreach($tree->getContentElements() as $element)
+			$this->addContentElementsToParent($button, $element);
+
 		foreach($tree->getRecursiveChildren() as $child)
-		{
 			$this->addChildrenToParent($button, $child);
-		}
+	}
+
+	public function addContentElementsToParent($parent, Model $model)
+	{
+		$buttonParameters = ButtonParametersHelper::extractFromModel($model);
+
+		$button = Button::create($buttonParameters);
+
+		$button->setDropdownMode('hover');
+
+		foreach($model->getContentElements() as $element)
+			$this->addContentElementsToParent($button, $element);
+
+		$parent->addButton($button);
 	}
 
 	public function setActiveNode(RecursiveTreeInterface $activeNode)
