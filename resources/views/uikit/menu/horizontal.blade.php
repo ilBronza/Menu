@@ -1,17 +1,23 @@
-<nav class="uk-navbar-container {{ $menu->getWrapClass() }}" uk-navbar>
+<div class="uk-navbar-container">
+	<div class="uk-container">
+		<nav class="uk-navbar {{ $menu->getWrapClass() }}" uk-navbar>
 
 	@foreach($menu->getNavbarsByOrientation('horizontal') as $navbar)
 
 		@if($navbar->mustBreakRow())
 
-</nav>
-<nav class="uk-navbar-container {{ $menu->getWrapClass() }}" uk-navbar>
+		</nav>
+		<nav class="uk-navbar-container {{ $menu->getWrapClass() }}" uk-navbar>
 
 		@endif
 
 	{!! $navbar->render() !!}
-	
+
 	@endforeach
+
+		</nav>
+	</div>
+</div>
 
 @if($menu->hasOffCanvas())
 	<div class="uk-navbar-right uk-hidden@l">
@@ -22,8 +28,6 @@
 		</ul>
 	</div>
 @endif
-
-</nav>
 
 
 @if($menu->hasOffCanvas())

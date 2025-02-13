@@ -3,10 +3,7 @@
 namespace IlBronza\Menu\Traits;
 
 use Auth;
-use IlBronza\Menu\Navbar;
 use IlBronza\UikitTemplate\Fetcher;
-use Illuminate\Support\Facades\Log;
-use Illuminate\View\View;
 
 trait MenuRenderTrait
 {

@@ -2,11 +2,13 @@
 
 namespace IlBronza\Menu;
 
-use Illuminate\Support\Facades\Blade;
+use IlBronza\CRUD\Traits\IlBronzaPackages\IlBronzaServiceProviderPackagesTrait;
 use Illuminate\Support\ServiceProvider;
 
 class MenuServiceProvider extends ServiceProvider
 {
+	use IlBronzaServiceProviderPackagesTrait;
+
     /**
      * Perform post-registration booting of services.
      *

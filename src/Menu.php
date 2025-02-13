@@ -22,9 +22,6 @@ class Menu
 		MenuRenderTrait::_render insteadof MenuPartsGenericRenderTrait;
 	}
 
-
-
-
 	public $id;
 	public $navbars;
 	public $buttons;

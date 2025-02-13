@@ -4,108 +4,109 @@ namespace IlBronza\Menu\Traits;
 
 trait MenuPartsGenericRenderTrait
 {
-    public ? string $viewFolder = null;
-    abstract public function getCacheName() : string;
+	public ?string $viewFolder = null;
 
-    public function getOrientation() : string
-    {
-        return $this->orientation;
-    }
+	abstract public function getCacheName() : string;
 
-    public function setOrientation(string $orientation) : self
-    {
-        $this->orientation = $orientation;
+	public function getOrientation() : string
+	{
+		return $this->orientation;
+	}
 
-        return $this;
-    }
+	public function setOrientation(string $orientation) : self
+	{
+		$this->orientation = $orientation;
 
-    public function getFromCache() : ? string
-    {
-        $menuName = $this->getCacheName();
+		return $this;
+	}
 
-        return cache($menuName);
-    }
+	public function getFromCache() : ?string
+	{
+		$menuName = $this->getCacheName();
 
-    public function renderFromCache() : string
-    {
-        if($result = $this->getFromCache())
-            return $result;
+		return cache($menuName);
+	}
 
-        $result = $this->_render();
+	public function renderFromCache() : string
+	{
+		if ($result = $this->getFromCache())
+			return $result;
 
-        $cacheElementName = $this->getCacheName();
+		$result = $this->_render();
 
-        cache([$cacheElementName => $result]);
+		$cacheElementName = $this->getCacheName();
 
-        return $result;
-    }
+		cache([$cacheElementName => $result]);
 
-    public function setUsesCache(bool $usesCache)
-    {
-        $this->usesCache = $usesCache;
-    }
+		return $result;
+	}
 
-    public function usesCache()
-    {
-        if(is_null($this->usesCache))
-            return config('menu.usesCache');
+	public function setUsesCache(bool $usesCache)
+	{
+		$this->usesCache = $usesCache;
+	}
 
-        return $this->usesCache;
-    }
+	public function usesCache()
+	{
+		if (is_null($this->usesCache))
+			return config('menu.usesCache');
 
-    public function render()
-    {
-        if($this->usesCache())
-            return $this->renderFromCache();
+		return $this->usesCache;
+	}
 
-        return $this->_render();
-    }
+	public function render()
+	{
+		if ($this->usesCache())
+			return $this->renderFromCache();
 
-    public function getTemplateName()
-    {
-        return config('menu.template', 'uikit');
-    }
+		return $this->_render();
+	}
 
-    public function getElementType() : string
-    {
-        return strtolower(class_basename($this));
-    }
+	public function getTemplateName()
+	{
+		return config('menu.template', 'uikit');
+	}
 
-    public function getViewFolder() : string
-    {
-        if($this->viewFolder)
-            return $this->viewFolder;
+	public function getElementType() : string
+	{
+		return strtolower(class_basename($this));
+	}
 
-        return strtolower(class_basename($this));
-    }
+	public function getViewFolder() : string
+	{
+		if ($this->viewFolder)
+			return $this->viewFolder;
 
-    public function setViewFolder(string $viewFolder) : self
-    {
-        $this->viewFolder = $viewFolder;
+		return strtolower(class_basename($this));
+	}
 
-        return $this;
-    }
+	public function setViewFolder(string $viewFolder) : self
+	{
+		$this->viewFolder = $viewFolder;
 
-    public function getViewName()
-    {
-        $template = $this->getTemplateName();
+		return $this;
+	}
 
-        $folder = $this->getViewFolder();
+	public function getViewName()
+	{
+		$template = $this->getTemplateName();
 
-        $folders = implode(".", [
-            $template,
-            $folder,
-            $this->getOrientation()
-        ]);
+		$folder = $this->getViewFolder();
 
-        return 'menu::' . $folders;
-    }
+		$folders = implode(".", [
+			$template,
+			$folder,
+			$this->getOrientation()
+		]);
 
-    public function _render()
-    {
-        $viewName = $this->getViewName();
-        $elementType = $this->getElementType();
+		return 'menu::' . $folders;
+	}
 
-        return view($viewName, [$elementType => $this])->render();
-    }
+	public function _render()
+	{
+		$viewName = $this->getViewName();
+		$elementType = $this->getElementType();
+
+		return view($viewName, [$elementType => $this])->render();
+	}
 }
