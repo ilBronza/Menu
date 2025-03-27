@@ -2,6 +2,8 @@
 
 namespace IlBronza\Menu\Traits;
 
+use function dd;
+
 trait MenuPartsGenericRenderTrait
 {
 	public ?string $viewFolder = null;

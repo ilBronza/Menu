@@ -2,6 +2,7 @@
 
 namespace IlBronza\Menu;
 
+use Auth;
 use IlBronza\Buttons\Button;
 use IlBronza\CRUD\Interfaces\RecursiveTreeInterface;
 use IlBronza\Menu\Traits\MenuPartsGenericRenderTrait;
@@ -10,11 +11,11 @@ class Navbar
 {
 	use MenuPartsGenericRenderTrait;
 
-	public ? RecursiveTreeInterface $activeModel;
+	public ?RecursiveTreeInterface $activeModel;
 
 	public $name = 'default';
 	public $orientation = 'horizontal';
-	public $usesCache = false;
+	public $usesCache;
 
 	public $position = 'left';
 
@@ -32,6 +33,21 @@ class Navbar
 	public function __construct()
 	{
 		$this->buttons = collect();
+	}
+
+	public function getName()
+	{
+		return $this->name;
+	}
+
+	static function create(array $parameters = [])
+	{
+		$navbar = new static();
+
+		foreach ($parameters as $name => $value)
+			$navbar->$name = $value;
+
+		return $navbar;
 	}
 
 	public function mustBreakRow() : bool
@@ -56,10 +72,10 @@ class Navbar
 
 	public function getButtons()
 	{
-		return $this->buttons->filter(function(Button $button)
-			{
-				return $button->userCanView();
-			})->sortBy('position');
+		return $this->buttons->filter(function (Button $button)
+		{
+			return $button->userCanView();
+		})->sortBy('position');
 	}
 
 	public function getAllButtons()
@@ -72,16 +88,6 @@ class Navbar
 		return count(
 			$this->getAllButtons()
 		);
-	}
-
-	static function create(array $parameters = [])
-	{
-		$navbar = new static();
-
-		foreach($parameters as $name => $value)
-			$navbar->$name = $value;
-
-		return $navbar;
 	}
 
 	public function setClearfix(bool $clearfix = true)
@@ -102,7 +108,7 @@ class Navbar
 
 	public function removeButton(Button $button) : Button
 	{
-		$this->buttons = $this->buttons->reject(function($item) use($button)
+		$this->buttons = $this->buttons->reject(function ($item) use ($button)
 		{
 			return $button->name == $item->name;
 		})->values();
@@ -154,14 +160,14 @@ class Navbar
 
 	public function getClearfixClass()
 	{
-		if($this->hasClearfix())
+		if ($this->hasClearfix())
 			return $this->template()->getWidthFullClass();
 	}
 
-	public function getButtonByName(string $name) : ? Button
+	public function getButtonByName(string $name) : ?Button
 	{
-		foreach($this->getAllButtons() as $button)
-			if($button->getName() == $name)
+		foreach ($this->getAllButtons() as $button)
+			if ($button->getName() == $name)
 				return $button;
 
 		return null;
@@ -185,19 +191,19 @@ class Navbar
 		return $this->clearfix;
 	}
 
-    public function getCacheName() : string
-    {
-        return 'cachedNavbar' . $this->getOrientation() . $this->getName();
-    }
+	public function getCacheName() : string
+	{
+		return Auth::id() . 'cachedNavbar' . $this->getOrientation() . $this->getName();
+	}
 
-    public function setActiveButtonByModel(RecursiveTreeInterface $activeModel) : static
-    {
-    	$this->activeModel = $activeModel;
+	public function setActiveButtonByModel(RecursiveTreeInterface $activeModel) : static
+	{
+		$this->activeModel = $activeModel;
 
-    	return $this;
-    }
+		return $this;
+	}
 
-    public function getActiveButton() : ? Button
+	public function getActiveButton() : ?Button
 	{
 		return $this->activeModel;
 	}

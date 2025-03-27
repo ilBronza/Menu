@@ -264,7 +264,7 @@ class Menu
 
     public function getCacheName() : string
     {
-        return Auth::id() . "iBMenu{$this->getOrientation()}";
+        return \Auth::id() . "iBMenu{$this->getOrientation()}";
     }
 
 	public function loadItemsFromServiceProviders()
