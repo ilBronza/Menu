@@ -110,7 +110,13 @@ class Menu
 			$parameters['name'] = Str::slug($parameters['text'] ?? $parameters['href']);
 
         if($button = $this->getButtonByName($parameters['name']))
+        {
+        	// dd($parameters['roles']);
+        	
+        	// dd($button);
+
         	return $button;
+        }
 
         return $this->createButton($parameters);
 	}
