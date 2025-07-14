@@ -22,6 +22,11 @@ trait MenuPartsGenericRenderTrait
 		return $this;
 	}
 
+	public function getCacheLifetimeSeconds() : int
+	{
+		return config('menu.cacheLifetimeSeconds', 60 * 10);
+	}
+
 	public function getFromCache() : ?string
 	{
 		$menuName = $this->getCacheName();
@@ -31,16 +36,21 @@ trait MenuPartsGenericRenderTrait
 
 	public function renderFromCache() : string
 	{
-		if ($result = $this->getFromCache())
-			return $result;
+			return cache()->remember(
+				$this->getCacheName(),
+				$this->getCacheLifetimeSeconds(),
+				function()
+				{
+					return $this->_render();
+				});
 
-		$result = $this->_render();
+		// $result = $this->_render();
 
-		$cacheElementName = $this->getCacheName();
+		// $cacheElementName = $this->getCacheName();
 
-		cache([$cacheElementName => $result]);
+		// cache()->put($cacheElementName, $result);
 
-		return $result;
+		// return $result;
 	}
 
 	public function setUsesCache(bool $usesCache)
