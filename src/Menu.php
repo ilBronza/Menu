@@ -268,6 +268,11 @@ class Menu
 		return $navbar;
 	}
 
+	public function isFullWidth() : bool
+	{
+		return config('menu.isFullWidth', true);
+	}
+
     public function getCacheName() : string
     {
         return \Auth::id() . "iBMenu{$this->getOrientation()}";

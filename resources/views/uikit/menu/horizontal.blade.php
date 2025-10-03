@@ -1,5 +1,5 @@
 <div class="uk-navbar-container">
-	<div class="uk-container">
+	<div class="uk-container @if($menu->isFullWidth()) uk-container-expand @endif">
 		<nav class="uk-navbar {{ $menu->getWrapClass() }}" uk-navbar>
 
 	@foreach($menu->getNavbarsByOrientation('horizontal') as $navbar)
