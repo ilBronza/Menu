@@ -44,7 +44,7 @@ class Menu
 	public function provideSettingsButton() : Button
 	{
 		return $this->provideButton([
-                'text' => 'generals.settings',
+                'text' => 'menu::menu.settings',
                 'name' => 'settings',
                 'icon' => 'gear',
                 'roles' => ['administrator']
