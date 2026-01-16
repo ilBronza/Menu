@@ -4,6 +4,7 @@ namespace IlBronza\Menu;
 
 use Auth;
 use IlBronza\Buttons\Button;
+use IlBronza\CRUD\Helpers\UserRolesPermissionsHelpers\UserRolesPermissionsHelper;
 use IlBronza\CRUD\Interfaces\RecursiveTreeInterface;
 use IlBronza\Menu\Traits\MenuPartsGenericRenderTrait;
 
@@ -74,7 +75,7 @@ class Navbar
 	{
 		return $this->buttons->filter(function (Button $button)
 		{
-			return $button->userCanView();
+			return UserRolesPermissionsHelper::hasValidItemRoles($button);
 		})->sortBy('position');
 	}
 
