@@ -1,3 +1,11 @@
+@php
+	$stickyAttrs = $menu->getSticky()
+		? 'sel-target: .uk-navbar-container; cls-active: uk-navbar-sticky; end: + *; offset: ' . $menu->getStickyOffset()
+		: null;
+@endphp
+@if($menu->getSticky())
+<div uk-sticky="{{ $stickyAttrs }}">
+@endif
 <div class="uk-navbar-container">
 	<div class="uk-container @if($menu->isFullWidth()) uk-container-expand @endif">
 		<nav class="uk-navbar {{ $menu->getWrapClass() }}" uk-navbar>
@@ -18,6 +26,9 @@
 		</nav>
 	</div>
 </div>
+@if($menu->getSticky())
+</div>
+@endif
 
 @if($menu->hasOffCanvas())
 	<div class="uk-navbar-right uk-hidden@l">

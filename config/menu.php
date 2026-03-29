@@ -7,6 +7,7 @@ return [
 
 	'serviceProviders' => [
 		'accountmanager',
+		'clients',
 		'CRUDMenuUtilities',
 		'translationsmenumanager'
 	],
@@ -28,5 +29,10 @@ return [
 		'width' => env(
 			'MENU_LOGO_WIDTH',
 			'80px'),
-	]
+	],
+
+	'navbar' => [
+		'sticky' => false,
+		'stickyOffset' => 80,
+	],
 ];

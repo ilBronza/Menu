@@ -33,6 +33,9 @@ class Menu
 
 	public $usesCache;
 
+	public ?bool $sticky = null;
+	public ?int $stickyOffset = null;
+
 	public function __construct()
 	{
 		$this->navbars = collect();
@@ -239,6 +242,36 @@ class Menu
 	public function template()
 	{
 		return app(config('app.template', 'uikittemplate'));
+	}
+
+	public function getSticky() : bool
+	{
+		if ($this->sticky !== null)
+			return $this->sticky;
+
+		return config('menu.navbar.sticky', false);
+	}
+
+	public function setSticky(bool $sticky) : static
+	{
+		$this->sticky = $sticky;
+
+		return $this;
+	}
+
+	public function getStickyOffset() : int
+	{
+		if ($this->stickyOffset !== null)
+			return $this->stickyOffset;
+
+		return config('menu.navbar.stickyOffset', 80);
+	}
+
+	public function setStickyOffset(int $offset) : static
+	{
+		$this->stickyOffset = $offset;
+
+		return $this;
 	}
 
 	public function getWrapClass() : ? string
