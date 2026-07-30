@@ -8,6 +8,7 @@ return [
 	'serviceProviders' => [
 		'accountmanager',
 		'clients',
+		'operators',
 		'CRUDMenuUtilities',
 		'translationsmenumanager'
 	],
