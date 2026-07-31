@@ -9,6 +9,7 @@ return [
 		'accountmanager',
 		'clients',
 		'operators',
+		'courses',
 		'CRUDMenuUtilities',
 		'translationsmenumanager'
 	],
