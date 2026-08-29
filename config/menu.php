@@ -15,7 +15,7 @@ return [
 	],
 
 	'buttons' => [
-		'dropdownMode' => 'click',
+		'dropdownMode' => 'hover',
 	],
 
 	'childrenPerColumn' => 10,

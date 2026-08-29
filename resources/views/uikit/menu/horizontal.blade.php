@@ -3,7 +3,7 @@
 		? 'sel-target: .uk-navbar-container; cls-active: uk-navbar-sticky; end: + *; offset: ' . $menu->getStickyOffset()
 		: null;
 	/** Allineamento doc UIkit: mode su uk-navbar così tutti i .uk-navbar-dropdown prendono lo stesso comportamento. */
-	$navbarMode = trim((string) config('menu.buttons.dropdownMode', 'click'));
+	$navbarMode = trim((string) config('menu.buttons.dropdownMode', 'hover'));
 	$navbarUkNavbarAttr = $navbarMode !== '' ? 'mode: ' . $navbarMode : null;
 @endphp
 @if($menu->getSticky())
