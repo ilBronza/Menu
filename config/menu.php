@@ -4,6 +4,12 @@ return [
 	// 'usesCache' => env('MENU_USES_CACHE', false),
 	'usesCache' => false,
 
+	// Enable when all branches are defined in menu providers or MenuItems.
+	// Controller-only branches require the traditional rendering path.
+	'progressive' => [
+		'enabled' => env('MENU_PROGRESSIVE', false),
+	],
+
 
 	'serviceProviders' => [
 		'accountmanager',

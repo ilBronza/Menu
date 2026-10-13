@@ -20,6 +20,7 @@ class Menu
 
 	use MenuRenderTrait {
 		MenuRenderTrait::_render insteadof MenuPartsGenericRenderTrait;
+		MenuRenderTrait::render insteadof MenuPartsGenericRenderTrait;
 	}
 
 	public $id;

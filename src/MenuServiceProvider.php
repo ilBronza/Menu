@@ -37,7 +37,7 @@ class MenuServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/menu.php', 'menu');
 
         // Register the service the package provides.
-        $this->app->singleton('menu', function ($app) {
+        $this->app->scoped('menu', function ($app) {
             return new Menu;
         });
     }
