@@ -6,6 +6,7 @@ use IlBronza\Buttons\Button;
 use IlBronza\CRUD\Helpers\UserRolesPermissionsHelpers\UserRolesPermissionsHelper;
 use IlBronza\Menu\Menu;
 use IlBronza\Menu\Navbar;
+use Illuminate\Support\Facades\Route;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -29,12 +30,8 @@ class MenuPayloadBuilder
         $this->prepare();
 
         $messages = [];
-        foreach (['loading', 'retry', 'loadError', 'openMenu', 'closeMenu', 'expand'] as $key)
+        foreach (['loading', 'retry', 'loadError', 'timeout', 'networkError', 'sessionExpired', 'accessDenied', 'branchUnavailable', 'login', 'reload', 'openMenu', 'closeMenu', 'expand'] as $key)
             $messages[$key] = trans('menu::menu.' . $key);
-
-        $offcanvasButton = $this->menu->hasOffCanvas() ? clone $this->menu->getOffCanvasButton() : null;
-        if ($offcanvasButton)
-            $offcanvasButton->setId($this->menu->getContainerId() . '-toggle');
 
         return [
             'version' => 1,
@@ -53,6 +50,7 @@ class MenuPayloadBuilder
                     'name' => $navbar->getName(),
                     'orientation' => $navbar->getOrientation(),
                     'classes' => $this->classes($navbar->getHtmlClasses()),
+                    'sidebarClasses' => $navbar->getCustomHtmlClassesString(),
                     'breakRow' => $navbar->mustBreakRow(),
                     'logo' => $logo ? [
                         'href' => $this->safeHref($logo->getHref()),
@@ -70,11 +68,10 @@ class MenuPayloadBuilder
                 'offcanvas' => (bool) $this->menu->hasOffCanvas(),
                 'showLogo' => $this->menu->showLogo(),
                 'offcanvasId' => $this->menu->getContainerId(),
-                'offcanvasButtonHtml' => $this->menu->hasOffCanvas()
-                    ? $offcanvasButton->renderButton()
-                    : null,
                 'dropdownMode' => config('menu.buttons.dropdownMode', 'hover'),
                 'openMobilePath' => (bool) config('menu.active.openMobilePath', true),
+                'requestTimeoutMs' => max(1, (int) config('menu.progressive.requestTimeoutMs', 10000)),
+                'loginUrl' => $this->loginUrl(),
             ],
             'messages' => $messages,
         ];
@@ -227,6 +224,8 @@ class MenuPayloadBuilder
             ));
             $displayButton->childrenPerColumn = $item['childrenPerColumn'];
             $item['childrenColumnNumber'] = $displayButton->getChildrenColumnNumber();
+            if ($button->childrenColumnNumber)
+                $item['fixedColumns'] = (int) $displayButton->getChildrenColumnNumber();
             if ($width = $displayButton->getDropdownWidth())
                 $item['dropdownWidth'] = $width;
         }
@@ -242,6 +241,15 @@ class MenuPayloadBuilder
         ];
 
         return $item;
+    }
+
+    protected function loginUrl() : ?string
+    {
+        $url = config('menu.progressive.loginUrl');
+        if ($url === null && Route::has('login'))
+            $url = route('login');
+
+        return $this->safeHref($url);
     }
 
     protected function classes(string $classes) : string

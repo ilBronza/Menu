@@ -8,6 +8,9 @@ return [
 	// Controller-only branches require the traditional rendering path.
 	'progressive' => [
 		'enabled' => env('MENU_PROGRESSIVE', false),
+		'requestTimeoutMs' => 10000,
+		// Null uses the application's named login route, when available.
+		'loginUrl' => null,
 	],
 
 	'active' => [

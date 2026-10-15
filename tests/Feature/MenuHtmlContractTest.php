@@ -5,11 +5,51 @@ namespace IlBronza\Menu\Tests\Feature;
 use DOMDocument;
 use DOMElement;
 use DOMNode;
+use DOMXPath;
 use IlBronza\Menu\Helpers\MenuPayloadBuilder;
 use IlBronza\Menu\Tests\TestCase;
 
 class MenuHtmlContractTest extends TestCase
 {
+    public function test_dropdown_columns_and_widths_follow_uikit_layout(): void
+    {
+        foreach ([1 => [1, 1, 1, 1, 1], 2 => [2, 2, 1]] as $perColumn => $expectedSizes) {
+            $button = $this->menu()->createButton([
+                'name' => 'columns-' . $perColumn, 'childrenPerColumn' => $perColumn,
+                'children' => array_map(fn ($i) => ['name' => 'leaf-' . $i, 'href' => '/leaf-' . $i], range(1, 5)),
+            ]);
+            $html = $button->navbarRender('horizontal');
+            $document = new DOMDocument();
+            $document->loadHTML($html, LIBXML_NOERROR | LIBXML_NOWARNING);
+            $xpath = new DOMXPath($document);
+            $sizes = [];
+            foreach ($xpath->query('//div[contains(@class, "uk-drop-grid")]/div/ul') as $column)
+                $sizes[] = $xpath->query('./li', $column)->length;
+            $this->assertSame($expectedSizes, $sizes);
+            $this->assertStringContainsString('uk-navbar-dropdown-width-' . count($expectedSizes), $html);
+            $this->assertStringNotContainsString('uk-width-auto', $html);
+        }
+
+        $button->setDropdownColumns(4);
+        $html = $button->navbarRender('horizontal');
+        $this->assertStringContainsString('uk-navbar-dropdown-width-4', $html);
+        $document->loadHTML($html, LIBXML_NOERROR | LIBXML_NOWARNING);
+        $sizes = [];
+        foreach ((new DOMXPath($document))->query('//div[contains(@class, "uk-drop-grid")]/div/ul') as $column)
+            $sizes[] = $column->getElementsByTagName('li')->length;
+        $this->assertSame([2, 1, 1, 1], $sizes);
+        $payload = (new MenuPayloadBuilder($this->menu()))->root();
+        $item = $payload['navbars'][0]['items'][1];
+        $this->assertSame(4, $item['fixedColumns']);
+        $document->loadHTML($item['html']['desktop'], LIBXML_NOERROR | LIBXML_NOWARNING);
+        $this->assertSame(4, (new DOMXPath($document))->query('//div[contains(@class, "uk-drop-grid")]/div/ul')->length);
+        $button->dropdownWidth = '620px';
+        $this->assertStringContainsString('width: 620px', $button->navbarRender('horizontal'));
+        $button->dropdownWidth = null;
+        $button->setDropdownColumns(6);
+        $this->assertStringContainsString('width: 1200px', $button->navbarRender('horizontal'));
+    }
+
     public function test_progressive_shells_preserve_the_existing_blade_structure(): void
     {
         config(['menu.logo.show' => true, 'menu.buttons.dropdownMode' => 'click']);
@@ -54,7 +94,9 @@ class MenuHtmlContractTest extends TestCase
 
         $first = $payload['navbars'][0]['items'][0];
         $this->assertStringContainsString('clienti-e-ordini', $first['html']['desktop']);
-        $this->assertStringContainsString('uk-nav-parent-icon', $first['html']['desktop']);
+        $this->assertStringContainsString('uk-navbar-parent-icon', $first['html']['desktop']);
+        $this->assertStringContainsString('uk-navbar-dropdown-width-2', $first['html']['desktop']);
+        $this->assertStringContainsString('uk-drop-grid', $first['html']['desktop']);
         $this->assertStringNotContainsString('Active clients', $first['html']['desktop']);
         $this->assertStringNotContainsString('Active clients', $first['html']['sidebar']);
         $this->assertSame(2.0, $first['childrenColumnNumber']);

@@ -5,6 +5,7 @@ const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
+const http = require('node:http');
 const { chromium } = require('playwright');
 
 let browser;
@@ -14,8 +15,8 @@ before(async () => {
 after(async () => { if (browser) await browser.close(); });
 
 const script = process.env.MENU_JS_PATH || path.resolve(__dirname, '../../resources/assets/js/progressive-menu.js');
-const branch = { id: 'clients', name: 'clients', text: 'Clients', href: '/clients', hasChildren: true, childrenUrl: '/menu/children/clients', childrenPerColumn: 2 };
-const child = withHtml({ id: 'active', name: 'active', text: 'Active clients', href: '/clients/active', hasChildren: true, childrenUrl: '/menu/children/active' });
+const branch = { id: 'clients', name: 'clients', text: 'Clients', href: '#', hasChildren: true, childrenUrl: '/menu/children/clients', childrenPerColumn: 2 };
+const child = withHtml({ id: 'active', name: 'active', isChild: true, text: 'Active clients', href: '#', hasChildren: true, childrenUrl: '/menu/children/active' });
 const payload = {
     version: 1,
     options: { offcanvas: true, offcanvasId: 'menu-container-fixture', dropdownMode: 'click', offcanvasButtonHtml: '<a href="#" class="ib-button" uk-toggle="target: #menu-container-fixture"><i class="fa-solid fa-bars"></i></a>' },
@@ -26,23 +27,23 @@ const payload = {
 // fixture below additionally compares the renderer against real Blade output.
 function withHtml(item) {
     if (item.html) return item;
-    const anchor = '<a href="' + (item.href || '#') + '" class="' + (item.classes || '') + '"' + (item.disabled ? ' disabled' : '') + '>' +
+    const anchor = '<a href="' + (item.href || '#') + '" class="' + (item.classes || '') + '"' + (item.disabled ? ' disabled' : '') + (item.toggle ? ' uk-toggle="target: ' + item.toggle + '"' : '') + '>' +
         (item.image ? '<img src="' + item.image + '" style="max-width:45px">' : '') + item.text +
-        (item.hasChildren ? '<span uk-nav-parent-icon></span>' : '') + '</a>';
+        (item.hasChildren ? '<span ' + (item.isChild ? 'uk-drop-parent-icon' : 'uk-navbar-parent-icon') + '></span>' : '') + '</a>';
     return { ...item, html: {
         desktop: '<li class="' + (item.hasChildren ? 'ib-navbar-dropdown-parent ' : '') + (item.name || item.id) + '">' + anchor +
-            (item.hasChildren ? '<div class="uk-navbar-dropdown uk-width-auto"><div class="uk-navbar-dropdown-grid uk-child-width-1-1" uk-grid><div><ul class="uk-nav uk-navbar-dropdown-nav"></ul></div></div></div>' : '') + '</li>',
+            (item.hasChildren ? '<div class="' + (item.isChild ? 'uk-dropdown' : 'uk-navbar-dropdown') + '"' + (item.isChild ? ' uk-dropdown="mode: click; pos: right-top"' : '') + '><div class="uk-drop-grid uk-navbar-dropdown-grid uk-child-width-1-1" uk-grid><div><ul class="uk-nav uk-navbar-dropdown-nav"></ul></div></div></div>' : '') + '</li>',
         sidebar: '<li class="' + (item.active ? 'uk-active ' : '') + (item.hasChildren ? 'uk-parent' : '') + '">' + anchor +
-            (item.hasChildren ? '<ul class="uk-nav-sub"></ul>' : '') + '</li>'
+            (item.hasChildren ? '<ul class="uk-nav-sub" uk-nav="multiple: true"></ul>' : '') + '</li>'
     } };
 }
 
-async function fixture(data = payload, useUIKit = false) {
+async function fixture(data = payload, useUIKit = false, existingPage, pageUrl = 'http://menu.test/') {
     data = structuredClone(data);
     data.navbars.forEach(navbar => { navbar.items = navbar.items.map(withHtml); });
-    const page = await browser.newPage();
-    await page.route('http://menu.test/', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><head></head><body></body></html>' }));
-    await page.goto('http://menu.test/');
+    const page = existingPage || await browser.newPage();
+    if (!existingPage && pageUrl === 'http://menu.test/') await page.route(pageUrl, route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><head></head><body></body></html>' }));
+    await page.goto(pageUrl);
     await page.evaluate(data => {
         const root = document.createElement('div');
         root.setAttribute('data-ib-progressive-menu', '');
@@ -68,13 +69,21 @@ async function click(page, selector) {
 const desktop = id => '[data-menu-primary] [data-menu-expand="' + id + '"]';
 const sidebar = id => '.ib-menu-sidebar [data-menu-expand="' + id + '"]';
 
+function cachedPayload(scope = '1'.repeat(64), revision = 'a'.repeat(64)) {
+    const data = structuredClone(payload);
+    data.activeState = { items: [], ancestors: [] };
+    data.browserCache = { enabled: true, key: scope, ttlSeconds: 300, maxEntries: 50 };
+    data.navbars[0].items[0].childrenCacheKey = revision;
+    return data;
+}
+
 test('initial render is roots only; sidebar creates no requests; links remain navigable', async () => {
     const page = await fixture();
     const requests = [];
     page.on('request', request => requests.push(request.url()));
     assert.equal(await page.locator('[data-menu-item]').count(), 2);
     assert.equal(await page.locator('.ib-menu-sidebar').count(), 0);
-    assert.equal(await page.locator('[data-menu-item=clients]>a').getAttribute('href'), '/clients');
+    assert.equal(await page.locator('[data-menu-item=home]>a').getAttribute('href'), '/');
     assert.equal(await page.locator('[data-menu-children=clients]').textContent(), '');
     await click(page, '[data-menu-hamburger]');
     assert.equal(await page.locator('.ib-menu-sidebar').count(), 1);
@@ -122,6 +131,316 @@ test('failed and HTML responses can retry, with no cached failure', async () => 
     await click(page, '[data-menu-retry=clients]');
     await page.waitForSelector('[data-menu-item=active]');
     assert.equal(requests, 2);
+    await page.close();
+});
+
+test('network failures show a connection message and retry with a fresh request', async () => {
+    const page = await fixture();
+    let requests = 0;
+    await page.route('**/menu/children/clients', route => {
+        requests++;
+        return requests === 1 ? route.abort('failed') : route.fulfill({ json: { items: [child] } });
+    });
+    await click(page, desktop('clients'));
+    await page.waitForSelector('[data-menu-error=networkError][role=alert]');
+    assert.match(await page.locator('[data-menu-error=networkError]').textContent(), /Connection problem/);
+    await click(page, '[data-menu-retry=clients]');
+    await page.waitForSelector('[data-menu-item=active]');
+    assert.equal(requests, 2);
+    await page.close();
+});
+
+for (const [status, code] of [[403, 'accessDenied'], [404, 'branchUnavailable'], [410, 'branchUnavailable']]) {
+    test('terminal HTTP error ' + status + ' has a specific message without retry', async () => {
+        const data = cachedPayload();
+        const page = await fixture(data);
+        let requests = 0;
+        await page.route('**/menu/children/clients', route => {
+            requests++;
+            return route.fulfill({ status, json: { message: 'Do not display raw server details' } });
+        });
+        await click(page, desktop('clients'));
+        await page.waitForSelector('[data-menu-error=' + code + '][role=alert]');
+        assert.equal(await page.locator('[data-menu-retry]').count(), 0);
+        assert.equal(await page.locator('[data-menu-login]').count(), 0);
+        assert.doesNotMatch(await page.locator('[data-menu-error]').textContent(), /raw server details/);
+        // Failures remain outside the persistent branch cache.
+        await fixture(data, false, page);
+        await click(page, desktop('clients'));
+        await page.waitForSelector('[data-menu-error=' + code + ']');
+        assert.equal(requests, 2);
+        await page.close();
+    });
+}
+
+for (const status of [401, 419]) {
+    test('expired session ' + status + ' clears saved branches and offers login or reload', async () => {
+        const data = cachedPayload();
+        if (status === 401) data.options.loginUrl = '/sign-in';
+        data.navbars[0].items.push({ ...branch, id: 'tools', childrenUrl: '/menu/children/tools', childrenCacheKey: 'b'.repeat(64) });
+        const page = await fixture(data);
+        let requests = 0;
+        await page.route('**/menu/children/**', route => {
+            requests++;
+            return route.request().url().endsWith('/tools') ? route.fulfill({ status, json: { message: 'Unauthenticated' } }) :
+                route.fulfill({ json: { items: [withHtml({ id: 'leaf', text: 'Saved branch', href: '/leaf' })] } });
+        });
+        await click(page, desktop('clients'));
+        await page.waitForSelector('[data-menu-item=leaf]');
+        await click(page, desktop('tools'));
+        await page.waitForSelector('[data-menu-children=tools] [data-menu-error=sessionExpired]');
+        assert.equal(await page.evaluate(() => sessionStorage.getItem('ib-menu-branches:v1')), null);
+        assert.equal(await page.locator('[data-menu-item=leaf]').count(), 0);
+        assert.equal(await page.locator('[data-menu-retry]').count(), 0);
+        if (status === 401) {
+            assert.equal(await page.locator('[data-menu-children=tools] [data-menu-login]').getAttribute('href'), 'http://menu.test/sign-in');
+        } else {
+            assert.equal(await page.locator('[data-menu-children=tools] [data-menu-reload]').textContent(), 'Reload page');
+        }
+        if (await page.locator(desktop('clients')).getAttribute('aria-expanded') === 'true') await click(page, desktop('clients'));
+        await click(page, desktop('clients'));
+        await page.waitForSelector('[data-menu-children=clients] [data-menu-error=sessionExpired]');
+        assert.equal(requests, 2, 'A known expired session must not reuse cached items or start more downloads.');
+        await page.close();
+    });
+}
+
+test('a redirect to the configured login page is treated as an expired session', async () => {
+    const data = structuredClone(payload);
+    data.options.loginUrl = '/sign-in';
+    // Real HTTP verifies fetch's final URL and redirected flag across a 302.
+    const server = http.createServer((request, response) => {
+        if (request.url === '/menu/children/clients') {
+            response.writeHead(302, { location: '/sign-in' });
+            response.end();
+        } else {
+            response.writeHead(200, { 'content-type': 'text/html' });
+            response.end('<!doctype html><html><head></head><body>Login</body></html>');
+        }
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const origin = 'http://127.0.0.1:' + server.address().port;
+    let page;
+    try {
+        page = await fixture(data, false, undefined, origin + '/');
+        await click(page, desktop('clients'));
+        await page.waitForSelector('[data-menu-error=sessionExpired]');
+        assert.equal(await page.locator('[data-menu-login]').getAttribute('href'), origin + '/sign-in');
+        assert.equal(await page.locator('[data-menu-retry]').count(), 0);
+    } finally {
+        if (page) await page.close();
+        await new Promise(resolve => server.close(resolve));
+    }
+});
+
+test('desktop and mobile share a timeout; retry succeeds and ignores the late response', async () => {
+    const data = cachedPayload();
+    data.options.requestTimeoutMs = 1000;
+    const page = await fixture(data);
+    await page.evaluate(() => {
+        const fetch = window.fetch;
+        window.menuAbortCount = 0;
+        window.fetch = function (url, options) {
+            if (options.signal) options.signal.addEventListener('abort', () => window.menuAbortCount++);
+            return fetch.call(this, url, options);
+        };
+    });
+    let requests = 0;
+    let release;
+    let finish;
+    const gate = new Promise(resolve => { release = resolve; });
+    const finished = new Promise(resolve => { finish = resolve; });
+    await page.route('**/menu/children/clients', async route => {
+        const first = ++requests === 1;
+        if (first) await gate;
+        try {
+            await route.fulfill({ json: { items: [withHtml({ id: 'leaf', text: first ? 'Late response' : 'Fresh response', href: '/leaf' })] } });
+        } catch (error) {
+            if (!first) throw error; // The first request was intentionally aborted.
+        } finally { if (first) finish(); }
+    });
+    await click(page, desktop('clients'));
+    await click(page, '[data-menu-hamburger]');
+    await click(page, sidebar('clients'));
+    await page.waitForFunction(() => document.querySelectorAll('[data-menu-error=timeout]').length === 2);
+    assert.equal(requests, 1);
+    assert.equal(await page.evaluate(() => window.menuAbortCount), 1);
+    assert.equal(await page.locator('[aria-busy=true]').count(), 0);
+    await click(page, '.ib-menu-sidebar [data-menu-retry=clients]');
+    await page.waitForSelector('.ib-menu-sidebar [data-menu-item=leaf]');
+    // Opening the hamburger closed the desktop drop; reopen it using the
+    // successful mobile retry, which must not cause another HTTP request.
+    await click(page, desktop('clients'));
+    await page.waitForSelector('[data-menu-primary] [data-menu-item=leaf]');
+    assert.equal(requests, 2);
+    release();
+    await finished;
+    await fixture(data, false, page);
+    await click(page, desktop('clients'));
+    await page.waitForSelector('[data-menu-item=leaf]');
+    assert.equal(await page.locator('[data-menu-item=leaf]').textContent(), 'Fresh response');
+    assert.equal(requests, 2);
+    await page.close();
+});
+
+test('timeout covers a stalled JSON body even without AbortController', async () => {
+    const data = structuredClone(payload);
+    data.options.requestTimeoutMs = 200;
+    data.messages = { timeout: 'Tempo massimo superato' };
+    const page = await fixture(data);
+    await page.route('**/menu/children/clients', route => route.fulfill({ json: { items: [child] } }));
+    await page.evaluate(() => {
+        const fetch = window.fetch;
+        window.AbortController = undefined;
+        window.menuFetchCount = 0;
+        window.fetch = function (url, options) {
+            if (++window.menuFetchCount > 1) return fetch.call(this, url, options);
+            return Promise.resolve({ ok: true, status: 200, redirected: false, headers: new Headers({ 'content-type': 'application/json' }), json: () => new Promise(() => {}) });
+        };
+    });
+    await click(page, desktop('clients'));
+    await page.waitForSelector('[data-menu-error=timeout]');
+    assert.match(await page.locator('[data-menu-error=timeout]').textContent(), /Tempo massimo superato/);
+    await click(page, '[data-menu-retry=clients]');
+    await page.waitForSelector('[data-menu-item=active]');
+    assert.equal(await page.evaluate(() => window.menuFetchCount), 2);
+    await page.close();
+});
+
+test('native mobile error messages wrap without overflowing the panel', { skip: !process.env.UIKIT_JS_PATH || !process.env.UIKIT_CSS_PATH }, async () => {
+    const data = structuredClone(payload);
+    data.options.loginUrl = '/sign-in';
+    data.messages = { sessionExpired: 'La sessione è scaduta. Accedi di nuovo per continuare a utilizzare le voci del menu.' };
+    const page = await fixture(data, true);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.route('**/menu/children/clients', route => route.fulfill({ status: 401, json: { message: 'Unauthenticated' } }));
+    await click(page, '[data-menu-hamburger]');
+    await click(page, sidebar('clients'));
+    await page.waitForSelector('.ib-menu-sidebar [data-menu-error=sessionExpired]');
+    const overflow = await page.locator('.uk-offcanvas-bar').evaluate(bar => bar.scrollWidth - bar.clientWidth);
+    assert.ok(overflow <= 1, 'Error text should wrap inside the mobile panel.');
+    assert.equal(await page.locator('.ib-menu-sidebar [data-menu-login]').isVisible(), true);
+    await page.close();
+});
+
+for (const native of [false, true]) {
+    test('active mobile path loads only its ancestors and keeps page state' + (native ? ' with UIkit' : ''), { skip: native && !process.env.UIKIT_JS_PATH }, async () => {
+        const data = structuredClone(payload);
+        data.activeState = { items: ['detail'], ancestors: ['clients', 'active'] };
+        data.navbars[0].items.push({ ...branch, id: 'unrelated', childrenUrl: '/menu/children/unrelated' });
+        const page = await fixture(data, native);
+        const requests = [];
+        await page.route('**/menu/children/**', route => {
+            const id = route.request().url().split('/').pop();
+            requests.push(id);
+            return route.fulfill({ json: { items: id === 'clients' ? [child, withHtml({ id: 'wrong', text: 'Wrong', href: '/other', active: true, classes: 'uk-text-bold custom' })] : [withHtml({ id: 'detail', text: 'Detail', href: '/detail' })] } });
+        });
+        assert.deepEqual(requests, []);
+        assert.equal(await page.locator('[data-menu-primary] [data-menu-item=clients]').getAttribute('class').then(value => value.includes('uk-active')), true);
+        assert.equal(await page.locator(desktop('clients')).getAttribute('aria-expanded'), 'false');
+        await click(page, '[data-menu-hamburger]');
+        await page.waitForSelector('.ib-menu-sidebar [data-menu-item=detail] > a[aria-current=page]');
+        assert.deepEqual(requests, ['clients', 'active']);
+        assert.equal(await page.locator(sidebar('clients')).getAttribute('aria-expanded'), 'true');
+        assert.equal(await page.locator(sidebar('active')).getAttribute('aria-expanded'), 'true');
+        assert.equal(await page.locator(sidebar('unrelated')).getAttribute('aria-expanded'), 'false');
+        assert.equal(await page.locator('.ib-menu-sidebar [data-menu-item=wrong]').getAttribute('class').then(value => value.includes('uk-active')), false);
+        assert.equal(await page.locator('.ib-menu-sidebar [data-menu-item=wrong] > a').getAttribute('aria-current'), null);
+        assert.equal(await page.locator('.ib-menu-sidebar [data-menu-item=wrong] > a').getAttribute('class').then(value => value.includes('uk-text-bold')), true);
+        assert.equal(await page.locator('.ib-menu-sidebar [data-menu-item=detail]').isVisible(), true);
+        await click(page, desktop('clients'));
+        await page.waitForSelector('[data-menu-primary] [data-menu-item=active].uk-active');
+        await click(page, desktop('active'));
+        await page.waitForSelector('[data-menu-primary] [data-menu-item=detail] > a[aria-current=page]');
+        assert.deepEqual(requests, ['clients', 'active']);
+        await page.close();
+    });
+}
+
+test('active path expansion can be disabled independently of highlighting', async () => {
+    const data = structuredClone(payload);
+    data.activeState = { items: [], ancestors: ['clients'] };
+    data.options.openMobilePath = false;
+    const page = await fixture(data);
+    const requests = [];
+    page.on('request', request => requests.push(request.url()));
+    await click(page, '[data-menu-hamburger]');
+    assert.deepEqual(requests, []);
+    assert.equal(await page.locator(sidebar('clients')).getAttribute('aria-expanded'), 'false');
+    assert.equal(await page.locator('.ib-menu-sidebar [data-menu-item=clients]').getAttribute('class').then(value => value.includes('uk-active')), true);
+    await page.close();
+});
+
+test('closing an active path during download does not expand its descendants', async () => {
+    const data = structuredClone(payload);
+    data.activeState = { items: ['detail'], ancestors: ['clients', 'active'] };
+    const page = await fixture(data);
+    const requests = [];
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    await page.route('**/menu/children/**', async route => {
+        const id = route.request().url().split('/').pop();
+        requests.push(id);
+        if (id === 'clients') await gate;
+        await route.fulfill({ json: { items: id === 'clients' ? [child] : [withHtml({ id: 'detail', text: 'Detail', href: '/detail' })] } });
+    });
+    await click(page, '[data-menu-hamburger]');
+    await page.waitForSelector('.ib-menu-sidebar [aria-busy=true]');
+    await click(page, sidebar('clients'));
+    release();
+    await page.waitForSelector(sidebar('active'), { state: 'attached' });
+    assert.deepEqual(requests, ['clients']);
+    assert.equal(await page.locator(sidebar('active')).getAttribute('aria-expanded'), 'false');
+    await click(page, sidebar('clients'));
+    await page.waitForSelector('.ib-menu-sidebar [data-menu-item=detail] > a[aria-current=page]');
+    assert.deepEqual(requests, ['clients', 'active']);
+    // Once revealed, reopening a parent preserves the user's collapsed child.
+    await click(page, sidebar('active'));
+    await click(page, sidebar('clients'));
+    await click(page, sidebar('clients'));
+    assert.equal(await page.locator(sidebar('active')).getAttribute('aria-expanded'), 'false');
+    await page.close();
+});
+
+test('traditional mobile menus open highlighted ancestors once using native Nav', { skip: !process.env.UIKIT_JS_PATH }, async () => {
+    const page = await fixture(payload, true);
+    await page.evaluate(() => {
+        const sidebar = document.createElement('div');
+        sidebar.id = 'legacy-sidebar';
+        sidebar.setAttribute('data-ib-menu-offcanvas', '');
+        sidebar.setAttribute('data-menu-open-active-path', 'true');
+        sidebar.setAttribute('uk-offcanvas', '');
+        sidebar.innerHTML = '<div class="uk-offcanvas-bar"><ul uk-nav="multiple: true">' +
+            '<li id="legacy-parent" class="uk-parent uk-active"><a href="#">Parent</a><ul class="uk-nav-sub" uk-nav="multiple: true">' +
+            '<li id="legacy-nested" class="uk-parent uk-active"><a href="#">Nested</a><ul class="uk-nav-sub"><li class="uk-active"><a href="/current">Current</a></li></ul></li></ul></li>' +
+            '<li id="legacy-other" class="uk-parent"><a href="#">Other</a><ul class="uk-nav-sub"><li><a href="/other">Other page</a></li></ul></li></ul></div>';
+        document.body.appendChild(sidebar);
+        window.IlBronzaProgressiveMenu.init(sidebar);
+        window.UIkit.update(sidebar);
+        window.UIkit.offcanvas(sidebar, { container: false }).show();
+    });
+    await page.waitForFunction(() => document.querySelector('#legacy-nested').classList.contains('uk-open'));
+    assert.equal(await page.locator('#legacy-parent').getAttribute('class').then(value => value.includes('uk-open')), true);
+    assert.equal(await page.locator('#legacy-other').getAttribute('class').then(value => value.includes('uk-open')), false);
+    assert.equal(await page.locator('#legacy-nested > a').getAttribute('aria-expanded'), 'true');
+    await page.evaluate(() => {
+        const nested = document.querySelector('#legacy-nested');
+        window.UIkit.getComponent(nested.parentElement, 'nav').toggle(0, false);
+        document.querySelector('#legacy-sidebar').dispatchEvent(new Event('beforeshow', { bubbles: true }));
+    });
+    assert.equal(await page.locator('#legacy-nested').getAttribute('class').then(value => value.includes('uk-open')), false);
+    await page.close();
+});
+
+test('explicit columns distribute all fetched items even when the branch changed size', async () => {
+    const data = structuredClone(payload);
+    data.navbars[0].items[0].fixedColumns = 4;
+    const page = await fixture(data);
+    await page.route('**/menu/children/clients', route => route.fulfill({ json: { items: Array.from({ length: 5 }, (_, i) => withHtml({ id: 'leaf-' + i, text: 'Leaf ' + i, href: '/leaf-' + i })) } }));
+    await click(page, desktop('clients'));
+    await page.waitForSelector('[data-menu-item=leaf-4]');
+    const sizes = await page.locator('[data-menu-children=clients] .uk-drop-grid > div > ul').evaluateAll(lists => lists.map(list => list.children.length));
+    assert.deepEqual(sizes, [2, 1, 1, 1]);
     await page.close();
 });
 
@@ -199,7 +518,7 @@ test('actual UIkit supports lazy dropdowns and sidebar without taking over paren
     await click(page, '[data-menu-hamburger]');
     await click(page, sidebar('clients'));
     await page.waitForFunction(() => document.querySelectorAll('[data-menu-item=active]').length === 2);
-    assert.equal(await page.locator('[data-menu-item=clients]>a').first().getAttribute('href'), '/clients');
+    assert.equal(await page.locator('[data-menu-item=home]>a').first().getAttribute('href'), '/');
     assert.equal(requests, 1);
     assert.deepEqual(errors, []);
     await page.close();
@@ -238,11 +557,12 @@ test('UIkit hover opens only the hovered branch; close during download stays clo
     await page.route('**/menu/children/clients', async route => { await gate; await route.fulfill({ json: { items: [child] } }); });
     // Move outside the navbar to release UIkit's initial-pointer guard.
     await page.mouse.move(1, 1);
-    await page.locator('[data-menu-item=click-only]').dispatchEvent('pointerenter', { pointerType: 'mouse' });
+    await page.locator(desktop('click-only')).dispatchEvent('pointerenter', { pointerType: 'mouse' });
     assert.equal(await page.locator(desktop('click-only')).getAttribute('aria-expanded'), 'false');
-    await page.locator('[data-menu-item=clients]').dispatchEvent('pointerenter', { pointerType: 'mouse' });
+    await page.locator(desktop('clients')).dispatchEvent('pointerenter', { pointerType: 'mouse' });
     await page.waitForFunction(() => document.querySelector('[data-menu-children=clients]').classList.contains('uk-open'));
-    await click(page, desktop('clients'));
+    await page.locator(desktop('clients')).focus();
+    await page.keyboard.press('Escape');
     release();
     await page.waitForFunction(() => document.querySelector('[data-menu-item=active]'));
     await page.waitForFunction(() => !document.querySelector('[data-menu-children=clients]').classList.contains('uk-open'));
@@ -278,7 +598,9 @@ test('progressive desktop and mobile DOM preserve real Blade structure, classes 
                 const panel = document.querySelector('[data-menu-primary] [data-menu-children="' + id + '"]');
                 return panel.children.length && !panel.hasAttribute('aria-busy');
             }, id);
-            await click(page, sidebar(id));
+            // The current page's path may already have opened this branch.
+            await page.waitForSelector(sidebar(id), { state: 'attached' });
+            if (await page.locator(sidebar(id)).getAttribute('aria-expanded') !== 'true') await click(page, sidebar(id));
             await page.waitForFunction(id => {
                 const panel = document.querySelector('.ib-menu-sidebar [data-menu-children="' + id + '"]');
                 return panel.children.length && !panel.hasAttribute('aria-busy');
@@ -426,4 +748,69 @@ test('opened progressive dropdowns keep native widths and link alignment at ever
         }
         await page.close();
     }
+});
+
+test('native mobile Nav controls nested branches and Offcanvas fits the viewport', { skip: !process.env.UIKIT_JS_PATH || !process.env.UIKIT_CSS_PATH }, async () => {
+    const page = await fixture(payload, true);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.route('**/menu/children/**', route => route.fulfill({ json: { items: route.request().url().endsWith('/clients') ? [child] : [withHtml({ id: 'detail', text: 'Detail', href: '/detail' })] } }));
+    assert.equal(await page.locator('[data-menu-hamburger]').evaluate(node => !!node.closest('[uk-navbar]')), true);
+    await page.locator('[data-menu-hamburger]').click();
+    await page.waitForFunction(() => document.querySelector('.ib-menu-sidebar').classList.contains('uk-open'));
+    await page.locator(sidebar('clients')).click();
+    await page.waitForSelector('.ib-menu-sidebar [data-menu-item=active]');
+    assert.equal(await page.locator('.ib-menu-sidebar .uk-nav-default').evaluate(list => UIkit.getComponent(list, 'nav').items.length), 1);
+    await page.locator(sidebar('active')).click();
+    await page.waitForSelector('.ib-menu-sidebar [data-menu-item=detail]');
+    assert.equal(await page.locator('.ib-menu-sidebar [data-menu-children=clients]').evaluate(list => !!UIkit.getComponent(list, 'nav')), true);
+    await page.locator('.ib-menu-sidebar [data-menu-item=detail] > a').focus();
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator(sidebar('active')).getAttribute('aria-expanded'), 'false');
+    assert.equal(await page.locator(sidebar('clients')).getAttribute('aria-expanded'), 'true');
+    const width = await page.locator('.ib-menu-sidebar .uk-offcanvas-bar').evaluate(bar => bar.getBoundingClientRect().width);
+    assert.ok(width <= 390, 'Offcanvas follows the framework width without a 600px inner wrapper.');
+    await page.locator('.ib-menu-sidebar .uk-offcanvas-close').click();
+    await page.waitForFunction(() => document.querySelector('[data-menu-hamburger]').getAttribute('aria-expanded') === 'false');
+    await page.close();
+});
+
+test('a native parent link opens first and remains navigable once its dropdown is open', { skip: !process.env.UIKIT_JS_PATH }, async () => {
+    const data = structuredClone(payload);
+    data.navbars[0].items[0].href = '/clients';
+    const page = await fixture(data, true);
+    await page.route('**/menu/children/clients', route => route.fulfill({ json: { items: [child] } }));
+    await page.waitForFunction(() => !!UIkit.getComponent(document.querySelector('[data-menu-item=clients] > a'), 'toggle'));
+    await page.locator(desktop('clients')).evaluate(link => link.addEventListener('click', event => {
+        window.parentClickPrevented = event.defaultPrevented;
+        event.preventDefault(); // Observe navigation intent without leaving the fixture.
+    }));
+    await click(page, desktop('clients'));
+    await page.waitForSelector('[data-menu-item=active]');
+    assert.equal(await page.evaluate(() => window.parentClickPrevented), true);
+    assert.equal(await page.locator(desktop('clients')).getAttribute('href'), '/clients');
+    await click(page, desktop('clients'));
+    assert.equal(await page.evaluate(() => window.parentClickPrevented), false);
+    assert.equal(await page.locator(desktop('clients') + ' [role=button]').count(), 0);
+    await page.close();
+});
+
+test('an external action keeps its native toggle and gets a separate submenu button', { skip: !process.env.UIKIT_JS_PATH }, async () => {
+    const data = structuredClone(payload);
+    data.navbars[0].items[0].toggle = '#external-panel';
+    const page = await fixture(data, true);
+    await page.evaluate(() => {
+        const target = document.createElement('div');
+        target.id = 'external-panel';
+        target.hidden = true;
+        document.body.appendChild(target);
+    });
+    await page.route('**/menu/children/clients', route => route.fulfill({ json: { items: [child] } }));
+    assert.equal(await page.locator(desktop('clients')).evaluate(control => control.tagName), 'BUTTON');
+    assert.equal(await page.locator('[data-menu-item=clients] > a').first().getAttribute('uk-toggle'), 'target: #external-panel');
+    await click(page, desktop('clients'));
+    await page.waitForSelector('[data-menu-item=active]');
+    assert.equal(await page.locator('#external-panel').isVisible(), false);
+    await click(page, '[data-menu-primary] [data-menu-item=clients] > a');
+    await page.waitForFunction(() => !document.querySelector('#external-panel').hidden);
+    await page.close();
 });

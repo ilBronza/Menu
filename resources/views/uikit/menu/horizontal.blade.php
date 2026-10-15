@@ -18,7 +18,7 @@
 		@if($navbar->mustBreakRow())
 
 		</nav>
-		<nav class="uk-navbar-container {{ $menu->getWrapClass() }}" @if($navbarUkNavbarAttr) uk-navbar="{{ $navbarUkNavbarAttr }}" @else uk-navbar @endif>
+		<nav class="uk-navbar {{ $menu->getWrapClass() }}" @if($navbarUkNavbarAttr) uk-navbar="{{ $navbarUkNavbarAttr }}" @else uk-navbar @endif>
 
 		@endif
 
@@ -26,23 +26,20 @@
 
 	@endforeach
 
+	@if($menu->hasOffCanvas())
+        <div class="uk-navbar-right uk-hidden@l">
+            <a class="uk-navbar-toggle" href="#{{ $menu->getContainerId() }}" uk-toggle="target: #{{ $menu->getContainerId() }}" aria-label="{{ trans('menu::menu.openMenu') }}">
+                <span uk-navbar-toggle-icon></span>
+            </a>
+        </div>
+	@endif
+
 		</nav>
 	</div>
 </div>
 @if($menu->getSticky())
 </div>
 @endif
-
-@if($menu->hasOffCanvas())
-	<div class="uk-navbar-right uk-hidden@l">
-		<ul class="uk-navbar-nav">
-			<li>
-				{!! $menu->getOffCanvasButton()->renderButton() !!}
-			</li>
-		</ul>
-	</div>
-@endif
-
 
 @if($menu->hasOffCanvas())
 {!! $menu->renderOffcanvas() !!}
