@@ -194,7 +194,10 @@ class Navbar
 
 	public function getCacheName() : string
 	{
-		return Auth::id() . 'cachedNavbar' . $this->getOrientation() . $this->getName();
+		$request = app('menu')->getActiveRequest();
+
+		return Auth::id() . 'cachedNavbar' . $this->getOrientation() . $this->getName() . '-'
+			. hash('sha256', $request->url() . '|' . $request->route()?->getName());
 	}
 
 	public function setActiveButtonByModel(RecursiveTreeInterface $activeModel) : static

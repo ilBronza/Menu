@@ -38,6 +38,11 @@ class MenuPayloadBuilder
 
         return [
             'version' => 1,
+            // Stable IDs retain the page context when branches use their own route.
+            'activeState' => [
+                'items' => array_keys(array_filter($this->nodes, fn (array $node) => $node['button']->isActive())),
+                'ancestors' => array_keys(array_filter($this->nodes, fn (array $node) => $node['button']->containsActiveElement())),
+            ],
             'navbars' => array_map(function (array $entry) {
                 /** @var Navbar $navbar */
                 $navbar = $entry['navbar'];
@@ -69,6 +74,7 @@ class MenuPayloadBuilder
                     ? $offcanvasButton->renderButton()
                     : null,
                 'dropdownMode' => config('menu.buttons.dropdownMode', 'hover'),
+                'openMobilePath' => (bool) config('menu.active.openMobilePath', true),
             ],
             'messages' => $messages,
         ];
@@ -89,7 +95,7 @@ class MenuPayloadBuilder
         if ($this->prepared)
             return;
 
-        $this->menu->loadItems();
+        $this->menu->resolveActiveItems();
         $occurrences = [];
 
         foreach ($this->menu->getNavbars() as $navbar)

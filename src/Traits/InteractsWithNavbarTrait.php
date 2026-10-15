@@ -6,6 +6,9 @@ use IlBronza\Menu\Navbar;
 
 trait InteractsWithNavbarTrait
 {
+    /** Named routes or wildcard patterns for this menu item's active state. */
+    public array|string|null $activeRoutes = null;
+
     public function isNavbarButton() : bool
     {
         if($this->isChild())

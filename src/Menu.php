@@ -309,7 +309,10 @@ class Menu
 
     public function getCacheName() : string
     {
-        return \Auth::id() . "iBMenu{$this->getOrientation()}";
+        $request = $this->getActiveRequest();
+
+        return \Auth::id() . "iBMenu{$this->getOrientation()}" . '-'
+            . hash('sha256', $request->url() . '|' . $request->route()?->getName());
     }
 
 	public function loadItemsFromServiceProviders()

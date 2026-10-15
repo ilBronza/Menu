@@ -10,6 +10,11 @@ return [
 		'enabled' => env('MENU_PROGRESSIVE', false),
 	],
 
+	'active' => [
+		'automatic' => true,
+		'openMobilePath' => true,
+	],
+
 
 	'serviceProviders' => [
 		'accountmanager',

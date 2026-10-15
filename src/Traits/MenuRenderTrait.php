@@ -3,13 +3,30 @@
 namespace IlBronza\Menu\Traits;
 
 use IlBronza\Menu\Helpers\MenuPayloadBuilder;
-use IlBronza\UikitTemplate\Fetcher;
+use IlBronza\Menu\Helpers\MenuActiveStateResolver;
+use IlBronza\Menu\Helpers\MenuFetcher;
+use Illuminate\Http\Request;
 
 trait MenuRenderTrait
 {
     protected bool $itemsLoaded = false;
     protected bool $itemsLoading = false;
     protected ?bool $progressive = null;
+    protected ?MenuActiveStateResolver $activeStateResolver = null;
+
+    public function getActiveRequest() : Request
+    {
+        return MenuActiveStateResolver::pageRequest(request());
+    }
+
+    public function resolveActiveItems() : self
+    {
+        $this->loadItems();
+        $this->activeStateResolver ??= new MenuActiveStateResolver();
+        $this->activeStateResolver->resolve($this, $this->getActiveRequest());
+
+        return $this;
+    }
 
     /** Build once even when both the horizontal and off-canvas views are rendered. */
     public function loadItems() : self
@@ -59,7 +76,7 @@ trait MenuRenderTrait
 
     public function _render() : string
     {
-        $this->loadItems();
+        $this->resolveActiveItems();
 
         if ($this->usesProgressiveRender())
             return view('menu::uikit.menu.progressive', [
@@ -74,8 +91,8 @@ trait MenuRenderTrait
 
     public function renderFetcher()
     {
-        $fetcher = new Fetcher([
-            'url' => route('ilBronza.menu.fetchMenu')
+        $fetcher = new MenuFetcher([
+            'url' => route('ilBronza.menu.fetchMenu', ['menuPage' => $this->getActiveRequest()->url()])
         ]);
 
         $fetcher->setRefresh(false);
