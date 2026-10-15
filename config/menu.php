@@ -13,6 +13,15 @@ return [
 		'loginUrl' => null,
 	],
 
+	'browserCache' => [
+		'enabled' => true,
+		'ttlSeconds' => 300,
+		'maxEntries' => 50,
+		// Bump after changing custom Button views; context can identify a tenant.
+		'version' => '1',
+		'context' => null,
+	],
+
 	'active' => [
 		'automatic' => true,
 		'openMobilePath' => true,

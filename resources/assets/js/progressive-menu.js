@@ -51,6 +51,97 @@
         } catch (error) { return null; }
     }
 
+    var storageKey = 'ib-menu-branches:v1';
+    function BranchStorage(options, hasActiveState) {
+        this.options = options || {};
+        this.storage = null;
+        try {
+            if (options && options.enabled === false) {
+                window.sessionStorage.removeItem(storageKey);
+                return;
+            }
+            if (!options || !options.enabled || !hasActiveState || !/^[a-f0-9]{64}$/.test(options.key || '') ||
+                !Number.isFinite(options.ttlSeconds) || options.ttlSeconds <= 0) return;
+            this.storage = window.sessionStorage;
+            var saved = this.readStore();
+            if (!saved || saved.scope !== options.key) this.saveStore({ version: 1, scope: options.key, entries: {} });
+        } catch (error) { this.storage = null; }
+    }
+
+    BranchStorage.prototype.readStore = function () {
+        if (!this.storage) return null;
+        try {
+            var saved = JSON.parse(this.storage.getItem(storageKey));
+            return saved && saved.version === 1 && saved.entries && typeof saved.entries === 'object' && !Array.isArray(saved.entries) ? saved : null;
+        } catch (error) { return null; }
+    };
+
+    BranchStorage.prototype.saveStore = function (saved) {
+        try { this.storage.setItem(storageKey, JSON.stringify(saved)); }
+        catch (error) { this.storage = null; }
+    };
+
+    BranchStorage.prototype.token = function (item) {
+        return /^[a-f0-9]{64}$/.test(item.childrenCacheKey || '') ? item.childrenCacheKey + ':' + item.id : null;
+    };
+
+    BranchStorage.prototype.read = function (item, url) {
+        var token = this.token(item);
+        var saved = this.readStore();
+        if (!token || !saved || saved.scope !== this.options.key) return null;
+        var entry = saved.entries[token];
+        if (!entry) return null;
+        var now = Date.now();
+        if (!Number.isFinite(entry.createdAt) || !Number.isFinite(entry.expiresAt) || entry.createdAt > now ||
+            Math.min(entry.expiresAt, entry.createdAt + this.options.ttlSeconds * 1000) <= now || entry.url !== url || !validItems(entry.items)) {
+            delete saved.entries[token];
+            this.saveStore(saved);
+            return null;
+        }
+        return entry.items;
+    };
+
+    BranchStorage.prototype.write = function (item, url, items) {
+        var token = this.token(item);
+        var saved = this.readStore();
+        // A response from a previous login/context must not restore its scope.
+        if (!token || !saved || saved.scope !== this.options.key || !validItems(items)) return;
+        var now = Date.now();
+        Object.keys(saved.entries).forEach(function (key) {
+            if (!saved.entries[key] || saved.entries[key].expiresAt <= now) delete saved.entries[key];
+        });
+        // Page state is always supplied by the fresh root manifest.
+        var contents = items.map(function (item) {
+            var copy = Object.assign({}, item);
+            delete copy.active;
+            delete copy.containsActive;
+            return copy;
+        });
+        saved.entries[token] = { createdAt: now, expiresAt: now + this.options.ttlSeconds * 1000, url: url, items: contents };
+        var limit = Math.max(1, Math.min(100, Number(this.options.maxEntries) || 50));
+        var keys = Object.keys(saved.entries).sort(function (first, second) {
+            return saved.entries[first].createdAt - saved.entries[second].createdAt;
+        });
+        keys.slice(0, Math.max(0, keys.length - limit)).forEach(function (key) { delete saved.entries[key]; });
+        this.saveStore(saved);
+    };
+
+    BranchStorage.prototype.remove = function (item) {
+        var token = this.token(item);
+        var saved = this.readStore();
+        if (!token || !saved || saved.scope !== this.options.key) return;
+        delete saved.entries[token];
+        this.saveStore(saved);
+    };
+
+    BranchStorage.prototype.clear = function () {
+        var saved = this.readStore();
+        if (saved && saved.scope === this.options.key) {
+            try { this.storage.removeItem(storageKey); } catch (error) {}
+        }
+        this.storage = null;
+    };
+
     function installStyles() {
         if (document.getElementById('ib-progressive-menu-style')) return;
         var style = element('style');
@@ -71,6 +162,7 @@
         this.activeAncestors = payload.activeState ? new Set(payload.activeState.ancestors || []) : null;
         this.messages = Object.assign({ loading: 'Loading…', retry: 'Retry', loadError: 'Unable to load menu.', timeout: 'The menu is taking too long to load.', networkError: 'Connection problem. Check your network and retry.', sessionExpired: 'Your session has expired. Sign in again to continue.', accessDenied: 'You do not have access to these menu items.', branchUnavailable: 'These menu items are no longer available.', login: 'Sign in', reload: 'Reload page', openMenu: 'Open menu', closeMenu: 'Close menu', expand: 'Expand' }, payload.messages);
         this.cache = new Map();
+        this.branchStorage = new BranchStorage(payload.browserCache, !!payload.activeState);
         this.sessionError = null;
         this.prefix = 'ib-menu-' + (++sequence);
         this.sidebarId = this.options.offcanvasId || this.prefix + '-sidebar';
@@ -155,8 +247,11 @@
         var promise = Promise.resolve().then(function () {
             var url = new URL(item.childrenUrl, document.baseURI);
             if (!item.childrenUrl || url.origin !== window.location.origin || !/^https?:$/.test(url.protocol)) throw menuError('loadError', false);
+            var cached = self.branchStorage.read(item, url.href);
+            if (cached) return cached;
             return self.downloadChildren(item, url).then(function (items) {
                 if (self.sessionError) throw self.sessionError;
+                self.branchStorage.write(item, url.href, items);
                 return items;
             });
         }).catch(function (error) {
@@ -164,6 +259,7 @@
             if (error.menuCode === 'sessionExpired') {
                 self.sessionError = error;
                 self.cache.clear();
+                self.branchStorage.clear();
                 self.branches.forEach(function (branch) {
                     if (branch.panel.isConnected && (branch.loaded || branch.pending || branch.open)) branch.showError(error);
                 });
@@ -272,6 +368,7 @@
         branch.showError = function (failure) {
             var problem = failure && failure.menuCode ? failure : menuError('loadError', true);
             self.cache.delete(item.id);
+            self.branchStorage.remove(item);
             branch.loaded = false;
             panel.removeAttribute('aria-busy');
             var status = element(view === 'desktop' ? 'div' : 'li', 'ib-menu-status');

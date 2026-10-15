@@ -77,6 +77,211 @@ function cachedPayload(scope = '1'.repeat(64), revision = 'a'.repeat(64)) {
     return data;
 }
 
+test('session cache survives navigation and uses the new page highlighting', async () => {
+    const data = cachedPayload();
+    data.activeState.items = ['active'];
+    const page = await fixture(data);
+    let requests = 0;
+    await page.route('**/menu/children/clients', route => {
+        requests++;
+        return route.fulfill({ json: { id: 'clients', items: [withHtml({ id: 'active', text: 'Clients page', href: '/clients', active: true })] } });
+    });
+    await click(page, desktop('clients'));
+    await page.waitForSelector('[data-menu-item=active] > a[aria-current=page]');
+    data.activeState.items = ['home'];
+    await fixture(data, false, page);
+    await click(page, desktop('clients'));
+    await page.waitForSelector('[data-menu-item=active]');
+    assert.equal(requests, 1);
+    assert.equal(await page.locator('[data-menu-item=active] > a').getAttribute('aria-current'), null);
+    assert.equal(await page.locator('[data-menu-item=active]').getAttribute('class').then(value => value.includes('uk-active')), false);
+    assert.equal(await page.locator('[data-menu-item=home] > a').getAttribute('aria-current'), 'page');
+    await click(page, '[data-menu-hamburger]');
+    await click(page, sidebar('clients'));
+    await page.waitForSelector('.ib-menu-sidebar [data-menu-item=active]');
+    assert.equal(requests, 1);
+    await page.close();
+});
+
+test('session cache misses after a branch revision or user context change', async () => {
+    const data = cachedPayload();
+    const page = await fixture(data);
+    let requests = 0;
+    await page.route('**/menu/children/clients', route => {
+        requests++;
+        return route.fulfill({ json: { items: [withHtml({ id: 'leaf', text: 'Version ' + requests, href: '/leaf' })] } });
+    });
+    for (const [scope, revision] of [['1', 'a'], ['1', 'b'], ['2', 'b']]) {
+        const next = cachedPayload(scope.repeat(64), revision.repeat(64));
+        if (requests) await fixture(next, false, page);
+        await click(page, desktop('clients'));
+        await page.waitForSelector('[data-menu-item=leaf]');
+    }
+    assert.equal(requests, 3);
+    assert.equal(await page.locator('[data-menu-item=leaf]').textContent(), 'Version 3');
+    await page.close();
+});
+
+test('a late response cannot restore the previous user context in session storage', async () => {
+    const page = await fixture(cachedPayload());
+    let requests = 0;
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    await page.route('**/menu/children/clients', async route => {
+        const number = ++requests;
+        if (number === 1) await gate;
+        await route.fulfill({ json: { items: [withHtml({ id: 'leaf', text: number === 1 ? 'Previous context' : 'Current context', href: '/leaf' })] } });
+    });
+    await click(page, desktop('clients'));
+    await page.waitForSelector('[data-menu-children=clients][aria-busy=true]');
+    const previousPanel = await page.locator('[data-menu-children=clients]').elementHandle();
+    const next = cachedPayload('2'.repeat(64));
+    next.navbars.forEach(navbar => { navbar.items = navbar.items.map(withHtml); });
+    await page.evaluate(data => {
+        document.querySelector('[data-ib-progressive-menu]').remove();
+        const root = document.createElement('div');
+        root.setAttribute('data-ib-progressive-menu', '');
+        const script = document.createElement('script');
+        script.type = 'application/json';
+        script.setAttribute('data-menu-payload', '');
+        script.textContent = JSON.stringify(data);
+        root.appendChild(script);
+        document.body.appendChild(root);
+    }, next);
+    await page.waitForSelector(desktop('clients'));
+    await click(page, desktop('clients'));
+    await page.waitForSelector('[data-menu-item=leaf]');
+    release();
+    await page.waitForFunction(panel => !panel.hasAttribute('aria-busy'), previousPanel);
+    await fixture(next, false, page);
+    await click(page, desktop('clients'));
+    await page.waitForSelector('[data-menu-item=leaf]');
+    assert.equal(requests, 2);
+    assert.equal(await page.locator('[data-menu-item=leaf]').textContent(), 'Current context');
+    await page.close();
+});
+
+test('session cache expires without extending its lifetime on reads', async () => {
+    const data = cachedPayload();
+    const page = await fixture(data);
+    let requests = 0;
+    await page.route('**/menu/children/clients', route => { requests++; return route.fulfill({ json: { items: [child] } }); });
+    await click(page, desktop('clients'));
+    await page.waitForSelector('[data-menu-item=active]');
+    await page.addInitScript(() => {
+        const realNow = Date.now;
+        Date.now = () => realNow() + 301000;
+    });
+    await fixture(data, false, page);
+    await click(page, desktop('clients'));
+    await page.waitForSelector('[data-menu-item=active]');
+    assert.equal(requests, 2);
+    await page.close();
+});
+
+for (const failure of ['blocked', 'full', 'corrupt', 'invalid-items']) {
+    test('unavailable or corrupt session storage falls back to normal requests: ' + failure, async () => {
+        const data = cachedPayload();
+        const page = await fixture(data);
+        let requests = 0;
+        const errors = [];
+        page.on('pageerror', error => errors.push(error.message));
+        await page.route('**/menu/children/clients', route => { requests++; return route.fulfill({ json: { items: [child] } }); });
+        await click(page, desktop('clients'));
+        await page.waitForSelector('[data-menu-item=active]');
+        if (failure === 'corrupt') await page.evaluate(() => sessionStorage.setItem('ib-menu-branches:v1', '{broken JSON'));
+        else if (failure === 'invalid-items') {
+            await page.evaluate(() => {
+                const data = JSON.parse(sessionStorage.getItem('ib-menu-branches:v1'));
+                Object.values(data.entries)[0].items = [{ id: 'broken' }];
+                sessionStorage.setItem('ib-menu-branches:v1', JSON.stringify(data));
+            });
+        }
+        else {
+            await page.addInitScript(failure => {
+                if (failure === 'blocked') Storage.prototype.getItem = () => { throw new DOMException('Blocked', 'SecurityError'); };
+                Storage.prototype.setItem = () => { throw new DOMException('Full', 'QuotaExceededError'); };
+            }, failure);
+            await page.evaluate(() => sessionStorage.clear());
+        }
+        await fixture(data, false, page);
+        await click(page, desktop('clients'));
+        await page.waitForSelector('[data-menu-item=active]');
+        assert.equal(requests, 2);
+        assert.deepEqual(errors, []);
+        await page.close();
+    });
+}
+
+test('failed downloads do not persist and disabling cache removes stored branches', async () => {
+    const data = cachedPayload();
+    const page = await fixture(data);
+    let requests = 0;
+    await page.route('**/menu/children/clients', route => {
+        requests++;
+        return requests === 1 ? route.fulfill({ status: 500, json: { message: 'Failure' } }) : route.fulfill({ json: { items: [child] } });
+    });
+    await click(page, desktop('clients'));
+    await page.waitForSelector('[data-menu-retry=clients]');
+    await fixture(data, false, page);
+    await click(page, desktop('clients'));
+    await page.waitForSelector('[data-menu-item=active]');
+    assert.equal(requests, 2);
+    data.browserCache = { enabled: false };
+    await fixture(data, false, page);
+    await click(page, desktop('clients'));
+    await page.waitForSelector('[data-menu-item=active]');
+    assert.equal(requests, 3);
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('ib-menu-branches:v1')), null);
+    await page.close();
+});
+
+test('retry discards a stored fragment that can no longer be rendered', async () => {
+    const data = cachedPayload();
+    const page = await fixture(data);
+    let requests = 0;
+    await page.route('**/menu/children/clients', route => { requests++; return route.fulfill({ json: { items: [child] } }); });
+    await click(page, desktop('clients'));
+    await page.waitForSelector('[data-menu-item=active]');
+    await page.evaluate(() => {
+        const saved = JSON.parse(sessionStorage.getItem('ib-menu-branches:v1'));
+        Object.values(saved.entries)[0].items[0].html.desktop = '';
+        sessionStorage.setItem('ib-menu-branches:v1', JSON.stringify(saved));
+    });
+    await fixture(data, false, page);
+    await click(page, desktop('clients'));
+    await page.waitForSelector('[data-menu-retry=clients]');
+    assert.equal(requests, 1);
+    await click(page, '[data-menu-retry=clients]');
+    await page.waitForSelector('[data-menu-item=active]');
+    assert.equal(requests, 2);
+    await page.close();
+});
+
+test('session cache bounds the number of stored branches', async () => {
+    const data = cachedPayload();
+    data.browserCache.maxEntries = 2;
+    data.navbars[0].items = ['first', 'second', 'third'].map(id => ({ ...branch, id, childrenUrl: '/menu/children/' + id, childrenCacheKey: 'a'.repeat(64) }));
+    const page = await fixture(data);
+    const requests = [];
+    await page.route('**/menu/children/**', route => {
+        const id = route.request().url().split('/').pop();
+        requests.push(id);
+        return route.fulfill({ json: { items: [withHtml({ id: id + '-leaf', text: id, href: '/' + id })] } });
+    });
+    for (const id of ['first', 'second', 'third']) {
+        await click(page, desktop(id));
+        await page.waitForSelector('[data-menu-item=' + id + '-leaf]');
+    }
+    await fixture(data, false, page);
+    await click(page, desktop('second'));
+    await page.waitForSelector('[data-menu-item=second-leaf]');
+    await click(page, desktop('first'));
+    await page.waitForSelector('[data-menu-item=first-leaf]');
+    assert.deepEqual(requests, ['first', 'second', 'third', 'first']);
+    await page.close();
+});
+
 test('initial render is roots only; sidebar creates no requests; links remain navigable', async () => {
     const page = await fixture();
     const requests = [];
@@ -187,6 +392,7 @@ for (const status of [401, 419]) {
         });
         await click(page, desktop('clients'));
         await page.waitForSelector('[data-menu-item=leaf]');
+        assert.notEqual(await page.evaluate(() => sessionStorage.getItem('ib-menu-branches:v1')), null);
         await click(page, desktop('tools'));
         await page.waitForSelector('[data-menu-children=tools] [data-menu-error=sessionExpired]');
         assert.equal(await page.evaluate(() => sessionStorage.getItem('ib-menu-branches:v1')), null);

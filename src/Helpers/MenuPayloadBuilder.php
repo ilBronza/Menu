@@ -6,12 +6,13 @@ use IlBronza\Buttons\Button;
 use IlBronza\CRUD\Helpers\UserRolesPermissionsHelpers\UserRolesPermissionsHelper;
 use IlBronza\Menu\Menu;
 use IlBronza\Menu\Navbar;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
  * Export one level at a time, sharing identifiers across the desktop and mobile menus.
- * A builder belongs to one request: personalized payloads must never be shared in cache.
+ * A builder belongs to one request; stored branches are scoped to the user's session.
  */
 class MenuPayloadBuilder
 {
@@ -40,6 +41,7 @@ class MenuPayloadBuilder
                 'items' => array_keys(array_filter($this->nodes, fn (array $node) => $node['button']->isActive())),
                 'ancestors' => array_keys(array_filter($this->nodes, fn (array $node) => $node['button']->containsActiveElement())),
             ],
+            'browserCache' => $this->browserCache(),
             'navbars' => array_map(function (array $entry) {
                 /** @var Navbar $navbar */
                 $navbar = $entry['navbar'];
@@ -139,6 +141,15 @@ class MenuPayloadBuilder
 
             $id = $this->identifier($path);
             $this->nodes[$id] = ['button' => $button, 'children' => $children];
+            // Fingerprint current visible data without rendering descendants.
+            // Page-specific highlighting and random HTML IDs must not invalidate it.
+            $data = $this->item($id, false);
+            unset($data['active'], $data['containsActive']);
+            $data['renderDropdownMode'] = $button->getDropdownMode();
+            $this->nodes[$id]['revision'] = hash('sha256', json_encode([
+                $data,
+                array_map(fn (string $child) => $this->nodes[$child]['revision'], $children),
+            ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
             $result[] = $id;
         }
 
@@ -163,7 +174,7 @@ class MenuPayloadBuilder
         return array_map(fn (string $id) => $this->item($id), $ids);
     }
 
-    protected function item(string $id) : array
+    protected function item(string $id, bool $renderHtml = true) : array
     {
         $node = $this->nodes[$id];
         /** @var Button $button */
@@ -228,7 +239,12 @@ class MenuPayloadBuilder
                 $item['fixedColumns'] = (int) $displayButton->getChildrenColumnNumber();
             if ($width = $displayButton->getDropdownWidth())
                 $item['dropdownWidth'] = $width;
+            if ($renderHtml)
+                $item['childrenCacheKey'] = $node['revision'];
         }
+
+        if (! $renderHtml)
+            return $item;
 
         // Render the very same Button views as the traditional menu. Empty
         // placeholders retain parent icons, columns and widths, while keeping
@@ -241,6 +257,34 @@ class MenuPayloadBuilder
         ];
 
         return $item;
+    }
+
+    protected function browserCache() : array
+    {
+        $user = Auth::user();
+        $ttl = max(0, (int) config('menu.browserCache.ttlSeconds', 300));
+        $enabled = (bool) config('menu.browserCache.enabled', true) && $user !== null && $ttl > 0;
+        if (! $enabled)
+            return ['enabled' => false];
+
+        $request = request();
+        $context = config('menu.browserCache.context');
+        if (is_callable($context))
+            $context = $context($this->menu);
+
+        return [
+            'enabled' => true,
+            'key' => hash_hmac('sha256', json_encode([
+                'version' => config('menu.browserCache.version', '1'),
+                'user' => [Auth::getDefaultDriver(), get_class($user), $user->getAuthIdentifier()],
+                'session' => $request->hasSession() ? $request->session()->getId() : null,
+                'locale' => app()->getLocale(),
+                'template' => [$this->menu->getTemplateName(), $this->menu->getViewFolder(), config('app.template')],
+                'context' => $context,
+            ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), (string) config('app.key')),
+            'ttlSeconds' => $ttl,
+            'maxEntries' => max(1, (int) config('menu.browserCache.maxEntries', 50)),
+        ];
     }
 
     protected function loginUrl() : ?string
