@@ -1,6 +1,42 @@
 # Menu
  Menu generator
 
+## Lingua del menu frontend
+
+`FrontendMenu` può ricevere dall'applicazione le lingue disponibili, la lingua
+selezionata e l'URL che gestisce il cambio tramite
+`withLanguages($languages, $locale, $action)`. Il package costruisce i dati del
+selettore con `languageSwitcher($urls)`, dove `$urls` è la mappa lingua → URL
+della pagina corrente, già risolta dal modello/oggetto del progetto.
+Restituisce un array vuoto quando ci sono meno di due destinazioni disponibili
+nelle lingue configurate. La persistenza della scelta appartiene
+all'applicazione che fornisce l'azione. UikitTemplate integra questo contratto
+nel proprio `FrontendServiceProvider` e nell'header pubblico.
+
+Nei provider che implementano `FrontendMenuProvider` usare le chiavi dei normali
+file lingua Laravel:
+
+```php
+public function build(FrontendMenu $menu, object $context): void
+{
+    // L'oggetto della pagina fornisce direttamente l'URL nella lingua scelta.
+    if ($url = $context->page->getDefaultSeoUrl($menu->locale())) {
+        $menu->addTranslated('navigation.page', $url);
+    }
+}
+```
+
+`addTranslated()` e `translate()` usano la lingua del menu e il fallback del
+traduttore Laravel. `add()` conserva il testo letterale ricevuto, quindi i
+provider esistenti vanno adattati solo per le voci da tradurre. La lingua
+applicativa e il contesto della pagina non vengono modificati; `$menu->locale()`
+espone la lingua da passare ai getter pubblici dei modelli/oggetti. Menu conserva
+esattamente gli URL ricevuti: nessuna riscrittura o aggiunta automatica di prefissi.
+Il nome del getter dipende dall'oggetto: `getDefaultSeoUrl()` nell'esempio è il
+punto di estensione pubblico di `HasSeo`, da implementare nel modello.
+La selezione non riguarda il menu
+amministrativo né il suo caricamento progressivo.
+
 ## Voce attiva e percorso corrente
 
 Il menu riconosce automaticamente il collegamento alla pagina corrente e
